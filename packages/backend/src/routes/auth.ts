@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { createHash } from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import logger from '../lib/logger.js';
 import { generateToken, generateTokens, verifyRefreshToken, authenticate, JWTPayload } from '../middleware/auth.js';
 import { loginLimiter, signupLimiter, passwordChangeLimiter } from '../middleware/rateLimit.js';
 
@@ -92,7 +93,7 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Signup error:', error);
+    logger.error('Signup error', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to create account' });
   }
 });
@@ -157,7 +158,7 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to authenticate' });
   }
 });
@@ -219,7 +220,7 @@ router.post('/verify-token', async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('Token verification error:', error);
+    logger.error('Token verification error', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to verify token', valid: false });
   }
 });
@@ -256,7 +257,7 @@ router.get('/me', authenticate, async (req: Request, res: Response) => {
 
     res.json({ user });
   } catch (error) {
-    console.error('Get user error:', error);
+    logger.error('Get user error', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to get user info' });
   }
 });
@@ -336,7 +337,7 @@ router.post('/change-password', authenticate, passwordChangeLimiter, async (req:
 
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
-    console.error('Change password error:', error);
+    logger.error('Change password error', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to change password' });
   }
 });
@@ -401,7 +402,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
       expiresIn: tokens.expiresIn,
     });
   } catch (error) {
-    console.error('Refresh token error:', error);
+    logger.error('Refresh token error', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to refresh token' });
   }
 });
@@ -438,7 +439,7 @@ router.post('/logout', authenticate, async (req: Request, res: Response) => {
 
     res.json({ message: 'Logged out successfully' });
   } catch (error) {
-    console.error('Logout error:', error);
+    logger.error('Logout error', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to logout' });
   }
 });
@@ -456,7 +457,7 @@ router.post('/logout-all', authenticate, async (req: Request, res: Response) => 
 
     res.json({ message: 'Logged out from all devices' });
   } catch (error) {
-    console.error('Logout all error:', error);
+    logger.error('Logout all error', { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: 'Failed to logout from all devices' });
   }
 });
