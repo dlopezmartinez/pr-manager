@@ -227,4 +227,4 @@ export function verifyWebhookSignature(
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
 }
 
-export type { LemonSqueezySubscription, LemonSqueezyCheckout };
+export type { LemonSqueezySubscription };
