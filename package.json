@@ -35,5 +35,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@types/dompurify": "^3.2.0",
+    "dompurify": "^3.3.1"
   }
 }
