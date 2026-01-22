@@ -10,10 +10,12 @@ export interface UsePollingOptions {
   immediate?: boolean;
   /** Timeout for each poll in ms (default: 30000) */
   pollTimeout?: number;
+  /** Custom polling interval in milliseconds. If not provided, uses configStore.pollingInterval */
+  interval?: number;
 }
 
 export function usePolling(options: UsePollingOptions) {
-  const { onPoll, immediate = false, pollTimeout = 30000 } = options;
+  const { onPoll, immediate = false, pollTimeout = 30000, interval: customInterval } = options;
 
   let pollTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let countdownId: ReturnType<typeof setInterval> | null = null;
@@ -23,7 +25,12 @@ export function usePolling(options: UsePollingOptions) {
   let isPollInProgress = false;
 
   const isEnabled = computed(() => configStore.pollingEnabled);
-  const interval = computed(() => configStore.pollingInterval * 1000); // Convert to ms
+  // Use custom interval if provided, otherwise fall back to configStore
+  const interval = computed(() =>
+    customInterval !== undefined
+      ? customInterval
+      : configStore.pollingInterval * 1000
+  );
   const isBackgroundPollingEnabled = computed(() => configStore.backgroundPolling);
 
   function clearAllTimers(): void {

@@ -135,6 +135,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import { RefreshCw, Settings, AlertTriangle } from 'lucide-vue-next';
 import { useGitProvider } from './composables/useGitProvider';
 import { useViewPolling } from './composables/useViewPolling';
+import { useAuthHealthPolling } from './composables/useAuthHealthPolling';
 import { useViewState, getAllViewStates, clearAllViewStates } from './composables/useViewState';
 import { useTheme } from './composables/useTheme';
 import { ViewAdapter } from './adapters/ViewAdapter';
@@ -213,6 +214,9 @@ const prCounts = computed(() => {
 
 // Setup view-aware polling
 const { isPolling, nextPollIn, startPolling, restartPolling, refreshActiveView } = useViewPolling();
+
+// Setup auth health polling
+const authHealthPolling = useAuthHealthPolling();
 
 onMounted(async () => {
   // Initialize auth first
@@ -296,6 +300,18 @@ function handleChangeTokenFromScopes(): void {
   showSettings.value = true;
 }
 
+// Watch for auth state changes to manage auth health polling
+watch(
+  () => authStore.state.isAuthenticated,
+  (authenticated) => {
+    if (authenticated && authStore.canUseApp.value) {
+      authHealthPolling.startPolling();
+    } else {
+      authHealthPolling.stopPolling();
+    }
+  }
+);
+
 // Watch for notification config changes
 watch(
   () => ({
@@ -359,6 +375,7 @@ function handleSubscribed() {
  */
 function handleAuthLogout() {
   // Auth store already cleared, just reset local state
+  authHealthPolling.stopPolling();
   clearAllViewStates();
   notificationManager.reset();
 }
@@ -373,6 +390,7 @@ function handleConfigured() {
 
 function handleLogout() {
   showSettings.value = false;
+  authHealthPolling.stopPolling();
   clearAllViewStates();
   notificationManager.reset();
 }

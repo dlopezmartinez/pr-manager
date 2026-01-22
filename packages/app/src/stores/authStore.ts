@@ -176,6 +176,34 @@ async function logout(): Promise<void> {
 }
 
 /**
+ * Handle expired/invalid token
+ * Called by health polling when token is no longer valid
+ */
+async function handleExpiredToken(): Promise<void> {
+  console.warn('[Auth] Token expired or invalid, forcing logout');
+
+  // Clear auth data
+  state.isAuthenticated = false;
+  state.user = null;
+  state.subscription = null;
+
+  // Show native notification to user
+  try {
+    if (window.electronAPI?.ipc) {
+      window.electronAPI.ipc.send('show-notification', {
+        title: 'Session Expired',
+        body: 'Your session has expired. Please sign in again.',
+      });
+    }
+  } catch (error) {
+    console.error('Failed to show expiration notification:', error);
+  }
+
+  // Clear tokens from storage
+  await authService.logout();
+}
+
+/**
  * Refresh subscription status from the backend
  */
 async function refreshSubscription(): Promise<void> {
@@ -258,4 +286,5 @@ export const authStore = {
   openCheckout,
   openCustomerPortal,
   clearError,
+  handleExpiredToken,
 };

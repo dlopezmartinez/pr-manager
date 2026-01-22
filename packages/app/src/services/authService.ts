@@ -135,6 +135,43 @@ class AuthService {
   }
 
   /**
+   * Health check - lightweight token validation
+   * Returns true if token is valid, false otherwise
+   */
+  async checkHealth(): Promise<boolean> {
+    if (!this.token) {
+      return false;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/auth/health`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+        },
+      });
+
+      if (response.ok) {
+        return true;
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        // Token is invalid/expired - clear auth
+        await this.clearAuth();
+        return false;
+      }
+
+      // Other errors (5xx, network) - don't clear auth
+      console.warn('Auth health check failed with status:', response.status);
+      return true; // Assume token is still valid on network errors
+    } catch (error) {
+      // Network error - don't clear auth, just log
+      console.error('Auth health check network error:', error);
+      return true; // Assume token is still valid on network errors
+    }
+  }
+
+  /**
    * Get subscription status for the current user
    */
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
