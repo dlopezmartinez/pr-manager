@@ -1,0 +1,39 @@
+{
+  "name": "pr-manager",
+  "version": "2.0.0",
+  "description": "PR Manager - A beautiful menubar app to manage your Pull Requests",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "app:dev": "npm run dev -w @pr-manager/app",
+    "app:build": "npm run build -w @pr-manager/app",
+    "app:make": "npm run make -w @pr-manager/app",
+    "app:make:mac": "npm run make:mac -w @pr-manager/app",
+    "app:make:win": "npm run make:win -w @pr-manager/app",
+    "app:make:linux": "npm run make:linux -w @pr-manager/app",
+    "app:test": "npm run test -w @pr-manager/app",
+    "app:lint": "npm run lint -w @pr-manager/app",
+    "backend:dev": "npm run dev -w @pr-manager/backend",
+    "backend:build": "npm run build -w @pr-manager/backend",
+    "backend:start": "npm run start -w @pr-manager/backend",
+    "landing:dev": "npm run dev -w @pr-manager/landing",
+    "landing:build": "npm run build -w @pr-manager/landing",
+    "landing:preview": "npm run preview -w @pr-manager/landing",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "prepare": "husky"
+  },
+  "author": "Daniel Lopez Martinez",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "husky": "^9.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
