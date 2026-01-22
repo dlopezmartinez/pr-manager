@@ -7,6 +7,8 @@ import subscriptionRoutes from './routes/subscription.js';
 import webhookRoutes from './routes/webhook.js';
 import checkoutRoutes from './routes/checkout.js';
 import downloadRoutes from './routes/download.js';
+import { scheduleDaily, startScheduler, getSchedulerStatus } from './services/scheduler.js';
+import { runSubscriptionSync } from './jobs/syncSubscriptions.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,6 +41,11 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// Scheduler status endpoint (for monitoring)
+app.get('/health/scheduler', (req: Request, res: Response) => {
+  res.json(getSchedulerStatus());
+});
+
 // API routes
 app.use('/auth', authRoutes);
 app.use('/subscription', subscriptionRoutes);
@@ -65,7 +72,15 @@ app.listen(PORT, () => {
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`Scheduler status: http://localhost:${PORT}/health/scheduler`);
   }
+
+  // Register and start scheduled jobs
+  // Sync subscriptions daily at 2:00 AM UTC
+  scheduleDaily('syncSubscriptions', runSubscriptionSync, 2);
+
+  // Start the scheduler
+  startScheduler();
 });
 
 export default app;
