@@ -12,7 +12,6 @@ jobs:
   deploy:
     name: "🚀 Deploy to Railway"
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
       - name: "📥 Checkout"
