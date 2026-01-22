@@ -103,7 +103,7 @@ async function lemonSqueezyFetch<T>(
     throw new Error(`LemonSqueezy API error: ${response.status}`);
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
 /**

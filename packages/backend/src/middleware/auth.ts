@@ -52,7 +52,9 @@ export function generateToken(payload: JWTPayload): string {
     throw new Error('JWT_SECRET not configured');
   }
 
+  const expiresIn = process.env.JWT_EXPIRY || '7d';
+
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRY || '7d',
+    expiresIn: expiresIn as jwt.SignOptions['expiresIn'],
   });
 }
