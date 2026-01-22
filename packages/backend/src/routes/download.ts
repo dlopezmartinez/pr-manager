@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { verifySignedDownload, getGitHubReleaseUrl } from '../lib/signature.js';
 import { hasActiveSubscriptionOrIsSuperuser } from '../lib/authorization.js';
+import { downloadLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
@@ -15,7 +16,7 @@ const router = Router();
  * - expires: Timestamp when the link expires
  * - user: User ID who requested the download
  */
-router.get('/:platform/:version', async (req: Request, res: Response) => {
+router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Response) => {
   try {
     const paramsSchema = z.object({
       platform: z.enum(['mac', 'windows', 'linux-deb', 'linux-rpm']),

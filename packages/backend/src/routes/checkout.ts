@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { generateToken, authenticate } from '../middleware/auth.js';
 import { generateAllSignedUrls } from '../lib/signature.js';
 import { hasActiveSubscriptionOrIsSuperuser } from '../lib/authorization.js';
+import { checkoutLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ const router = Router();
  * Create a public LemonSqueezy Checkout session (no auth required)
  * Used by landing page for new customers
  */
-router.post('/create', async (req: Request, res: Response) => {
+router.post('/create', checkoutLimiter, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
       priceId: z.enum(['monthly', 'yearly']),

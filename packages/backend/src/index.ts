@@ -9,6 +9,13 @@ import checkoutRoutes from './routes/checkout.js';
 import downloadRoutes from './routes/download.js';
 import { scheduleDaily, startScheduler, getSchedulerStatus } from './services/scheduler.js';
 import { runSubscriptionSync } from './jobs/syncSubscriptions.js';
+import {
+  loginLimiter,
+  signupLimiter,
+  globalLimiter,
+  downloadLimiter,
+  checkoutLimiter,
+} from './middleware/rateLimit.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -32,7 +39,10 @@ app.use('/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
 // JSON body parser for other routes
 app.use(express.json());
 
-// Health check endpoint
+// Global rate limiter (applies to all routes)
+app.use(globalLimiter);
+
+// Health check endpoint (no rate limit)
 app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',

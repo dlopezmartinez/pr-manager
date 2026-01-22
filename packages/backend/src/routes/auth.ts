@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { generateToken, authenticate, JWTPayload } from '../middleware/auth.js';
+import { loginLimiter, signupLimiter, passwordChangeLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ const verifyTokenSchema = z.object({
  * POST /auth/signup
  * Create a new user account
  */
-router.post('/signup', async (req: Request, res: Response) => {
+router.post('/signup', signupLimiter, async (req: Request, res: Response) => {
   try {
     const validation = signupSchema.safeParse(req.body);
     if (!validation.success) {
@@ -95,7 +96,7 @@ router.post('/signup', async (req: Request, res: Response) => {
  * POST /auth/login
  * Authenticate user and return JWT token
  */
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', loginLimiter, async (req: Request, res: Response) => {
   try {
     const validation = loginSchema.safeParse(req.body);
     if (!validation.success) {
@@ -271,7 +272,7 @@ router.get('/health', authenticate, async (req: Request, res: Response) => {
  * POST /auth/change-password
  * Change user password (requires authentication)
  */
-router.post('/change-password', authenticate, async (req: Request, res: Response) => {
+router.post('/change-password', authenticate, passwordChangeLimiter, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
       currentPassword: z.string().min(1, 'Current password is required'),
