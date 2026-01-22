@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { verifySignedDownload, getGitHubReleaseUrl } from '../lib/signature.js';
+import { hasActiveSubscriptionOrIsSuperuser } from '../lib/authorization.js';
 
 const router = Router();
 
@@ -59,25 +60,24 @@ router.get('/:platform/:version', async (req: Request, res: Response) => {
       return;
     }
 
-    // Verify user exists and has an active subscription
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId },
-      include: { user: true },
+    // Verify user exists and has access
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true },
     });
 
-    if (!subscription) {
+    if (!user) {
       res.status(403).json({
-        error: 'No active subscription found',
+        error: 'User not found',
       });
       return;
     }
 
-    // Check if subscription is active
-    const activeStatuses = ['active', 'on_trial'];
-    if (!activeStatuses.includes(subscription.status)) {
+    // Check if user has active subscription or is SUPERUSER
+    if (!hasActiveSubscriptionOrIsSuperuser(user.role, user.subscription)) {
       res.status(403).json({
-        error: 'Subscription is not active',
-        status: subscription.status,
+        error: 'Access denied. Active subscription required.',
+        status: user.subscription?.status || 'none',
       });
       return;
     }
@@ -138,13 +138,25 @@ router.get('/latest/:platform', async (req: Request, res: Response) => {
       return;
     }
 
-    // Verify subscription
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId },
+    // Verify user exists and has access
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true },
     });
 
-    if (!subscription || !['active', 'on_trial'].includes(subscription.status)) {
-      res.status(403).json({ error: 'No active subscription' });
+    if (!user) {
+      res.status(403).json({
+        error: 'User not found',
+      });
+      return;
+    }
+
+    // Check if user has active subscription or is SUPERUSER
+    if (!hasActiveSubscriptionOrIsSuperuser(user.role, user.subscription)) {
+      res.status(403).json({
+        error: 'Access denied. Active subscription required.',
+        status: user.subscription?.status || 'none',
+      });
       return;
     }
 

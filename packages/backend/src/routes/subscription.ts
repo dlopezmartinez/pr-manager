@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import { UserRole } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import {
   createCheckout,
@@ -9,6 +10,7 @@ import {
   LEMONSQUEEZY_CONFIG,
 } from '../lib/lemonsqueezy.js';
 import { authenticate } from '../middleware/auth.js';
+import { hasActiveSubscription } from '../lib/authorization.js';
 
 const router = Router();
 
@@ -22,6 +24,21 @@ router.get('/status', authenticate, async (req: Request, res: Response) => {
       where: { userId: req.user!.userId },
     });
 
+    // Special case for SUPERUSER
+    if (req.user!.role === UserRole.SUPERUSER) {
+      res.json({
+        active: true,
+        status: subscription?.status || 'superuser',
+        isSuperuser: true,
+        message: 'SUPERUSER access - no subscription required',
+        currentPeriodStart: subscription?.currentPeriodStart,
+        currentPeriodEnd: subscription?.currentPeriodEnd,
+        cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd || false,
+        trialEndsAt: subscription?.trialEndsAt,
+      });
+      return;
+    }
+
     if (!subscription) {
       res.json({
         active: false,
@@ -32,8 +49,7 @@ router.get('/status', authenticate, async (req: Request, res: Response) => {
     }
 
     // Check if subscription is active
-    const activeStatuses = ['active', 'on_trial'];
-    const isActive = activeStatuses.includes(subscription.status);
+    const isActive = hasActiveSubscription(subscription);
 
     // Check if trial is still valid
     const isTrialing = subscription.status === 'on_trial';
@@ -90,7 +106,7 @@ router.post('/create-checkout', authenticate, async (req: Request, res: Response
     }
 
     // Check if user already has an active subscription
-    if (user.subscription && ['active', 'on_trial'].includes(user.subscription.status)) {
+    if (user.subscription && hasActiveSubscription(user.subscription)) {
       res.status(400).json({ error: 'You already have an active subscription' });
       return;
     }

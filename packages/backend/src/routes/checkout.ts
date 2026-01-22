@@ -2,8 +2,9 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { LEMONSQUEEZY_CONFIG, lemonSqueezyFetch, LemonSqueezyResponse, LemonSqueezyCheckout } from '../lib/lemonsqueezy.js';
 import { prisma } from '../lib/prisma.js';
-import { generateToken } from '../middleware/auth.js';
+import { generateToken, authenticate } from '../middleware/auth.js';
 import { generateAllSignedUrls } from '../lib/signature.js';
+import { hasActiveSubscriptionOrIsSuperuser } from '../lib/authorization.js';
 
 const router = Router();
 
@@ -161,9 +162,8 @@ router.post('/verify-session', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check if subscription is active
-    const activeStatuses = ['active', 'on_trial'];
-    if (!activeStatuses.includes(subscription.status)) {
+    // Check if user has active subscription or is SUPERUSER
+    if (!hasActiveSubscriptionOrIsSuperuser(user.role, subscription)) {
       res.status(403).json({
         error: 'Subscription is not active',
         status: subscription.status,
@@ -175,6 +175,7 @@ router.post('/verify-session', async (req: Request, res: Response) => {
     const token = generateToken({
       userId: user.id,
       email: user.email,
+      role: user.role,
     });
 
     // Get current version (from env or default)
@@ -190,6 +191,7 @@ router.post('/verify-session', async (req: Request, res: Response) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role,
       },
       subscription: {
         active: true,
@@ -212,43 +214,23 @@ router.post('/verify-session', async (req: Request, res: Response) => {
  * Get signed download URLs for authenticated users
  * Requires Bearer token authentication
  */
-router.get('/downloads', async (req: Request, res: Response) => {
+router.get('/downloads', authenticate, async (req: Request, res: Response) => {
   try {
-    // Get token from header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Authorization required' });
-      return;
-    }
-
-    const token = authHeader.substring(7);
-
-    // Verify token manually (without middleware to handle custom response)
-    const jwt = await import('jsonwebtoken');
-    let decoded: { userId: string; email: string };
-
-    try {
-      decoded = jwt.default.verify(token, process.env.JWT_SECRET!) as { userId: string; email: string };
-    } catch {
-      res.status(401).json({ error: 'Invalid or expired token' });
-      return;
-    }
-
-    // Check subscription
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: decoded.userId },
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      include: { subscription: true },
     });
 
-    if (!subscription) {
-      res.status(403).json({ error: 'No subscription found' });
+    if (!user) {
+      res.status(403).json({ error: 'User not found' });
       return;
     }
 
-    const activeStatuses = ['active', 'on_trial'];
-    if (!activeStatuses.includes(subscription.status)) {
+    // Check if user has active subscription or is SUPERUSER
+    if (!hasActiveSubscriptionOrIsSuperuser(user.role, user.subscription)) {
       res.status(403).json({
-        error: 'Subscription is not active',
-        status: subscription.status,
+        error: 'Active subscription required',
+        status: user.subscription?.status || 'none',
       });
       return;
     }
@@ -256,7 +238,7 @@ router.get('/downloads', async (req: Request, res: Response) => {
     const currentVersion = process.env.CURRENT_APP_VERSION || '1.0.0';
     const apiBaseUrl = process.env.API_BASE_URL || 'https://api.prmanager.app';
 
-    const downloadUrls = generateAllSignedUrls(decoded.userId, currentVersion, apiBaseUrl);
+    const downloadUrls = generateAllSignedUrls(req.user!.userId, currentVersion, apiBaseUrl);
 
     res.json({
       downloads: downloadUrls,

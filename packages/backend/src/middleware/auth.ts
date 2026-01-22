@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { UserRole } from '@prisma/client';
 
 export interface JWTPayload {
   userId: string;
   email: string;
+  role: UserRole;
 }
 
 declare global {
