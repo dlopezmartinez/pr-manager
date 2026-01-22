@@ -54,20 +54,22 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email: email.toLowerCase(),
-        passwordHash,
-        name,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        createdAt: true,
-      },
+    // Create user (transactional for consistency)
+    const user = await prisma.$transaction(async (tx) => {
+      return await tx.user.create({
+        data: {
+          email: email.toLowerCase(),
+          passwordHash,
+          name,
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
+      });
     });
 
     // Generate JWT token
@@ -310,10 +312,21 @@ router.post('/change-password', authenticate, passwordChangeLimiter, async (req:
     // Hash new password
     const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
-    // Update password
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: newPasswordHash },
+    // Update password AND invalidate all sessions (transactional)
+    // If either step fails, both rollback - ensures password never changes
+    // without invalidating sessions
+    await prisma.$transaction(async (tx) => {
+      // Update password hash
+      await tx.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newPasswordHash },
+      });
+
+      // Invalidate all existing sessions (force re-login everywhere)
+      // This prevents user from staying logged in with old sessions
+      await tx.session.deleteMany({
+        where: { userId: user.id },
+      });
     });
 
     res.json({ message: 'Password changed successfully' });

@@ -94,7 +94,7 @@ router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res
 });
 
 /**
- * Handle subscription created
+ * Handle subscription created (transactional)
  */
 async function handleSubscriptionCreated(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data, meta } = event;
@@ -102,7 +102,7 @@ async function handleSubscriptionCreated(event: LemonSqueezyWebhookEvent): Promi
 
   if (!userId) {
     console.error('No user_id in subscription custom_data:', data.id);
-    return;
+    throw new Error('Missing user_id in webhook data');
   }
 
   const attrs = data.attributes;
@@ -111,34 +111,37 @@ async function handleSubscriptionCreated(event: LemonSqueezyWebhookEvent): Promi
   const now = new Date();
   const renewsAt = attrs.renews_at ? new Date(attrs.renews_at) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  await prisma.subscription.upsert({
-    where: { lemonSqueezySubscriptionId: data.id },
-    update: {
-      status: attrs.status,
-      lemonSqueezyVariantId: String(attrs.variant_id),
-      currentPeriodStart: now,
-      currentPeriodEnd: renewsAt,
-      cancelAtPeriodEnd: attrs.cancelled,
-      trialEndsAt: attrs.trial_ends_at ? new Date(attrs.trial_ends_at) : null,
-    },
-    create: {
-      userId,
-      lemonSqueezyCustomerId: String(attrs.customer_id),
-      lemonSqueezySubscriptionId: data.id,
-      lemonSqueezyVariantId: String(attrs.variant_id),
-      status: attrs.status,
-      currentPeriodStart: now,
-      currentPeriodEnd: renewsAt,
-      cancelAtPeriodEnd: attrs.cancelled,
-      trialEndsAt: attrs.trial_ends_at ? new Date(attrs.trial_ends_at) : null,
-    },
+  // Use transaction to ensure subscription is created atomically
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.upsert({
+      where: { lemonSqueezySubscriptionId: data.id },
+      update: {
+        status: attrs.status,
+        lemonSqueezyVariantId: String(attrs.variant_id),
+        currentPeriodStart: now,
+        currentPeriodEnd: renewsAt,
+        cancelAtPeriodEnd: attrs.cancelled,
+        trialEndsAt: attrs.trial_ends_at ? new Date(attrs.trial_ends_at) : null,
+      },
+      create: {
+        userId,
+        lemonSqueezyCustomerId: String(attrs.customer_id),
+        lemonSqueezySubscriptionId: data.id,
+        lemonSqueezyVariantId: String(attrs.variant_id),
+        status: attrs.status,
+        currentPeriodStart: now,
+        currentPeriodEnd: renewsAt,
+        cancelAtPeriodEnd: attrs.cancelled,
+        trialEndsAt: attrs.trial_ends_at ? new Date(attrs.trial_ends_at) : null,
+      },
+    });
   });
 
-  console.log(`Subscription ${data.id} created for user ${userId}: ${attrs.status}`);
+  console.log(`[Webhook] Subscription ${data.id} created for user ${userId}: ${attrs.status}`);
 }
 
 /**
- * Handle subscription updated
+ * Handle subscription updated (transactional)
  */
 async function handleSubscriptionUpdated(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
@@ -146,125 +149,139 @@ async function handleSubscriptionUpdated(event: LemonSqueezyWebhookEvent): Promi
 
   const renewsAt = attrs.renews_at ? new Date(attrs.renews_at) : undefined;
 
-  await prisma.subscription.updateMany({
-    where: { lemonSqueezySubscriptionId: data.id },
-    data: {
-      status: attrs.status,
-      lemonSqueezyVariantId: String(attrs.variant_id),
-      currentPeriodEnd: renewsAt,
-      cancelAtPeriodEnd: attrs.cancelled,
-      trialEndsAt: attrs.trial_ends_at ? new Date(attrs.trial_ends_at) : null,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.updateMany({
+      where: { lemonSqueezySubscriptionId: data.id },
+      data: {
+        status: attrs.status,
+        lemonSqueezyVariantId: String(attrs.variant_id),
+        currentPeriodEnd: renewsAt,
+        cancelAtPeriodEnd: attrs.cancelled,
+        trialEndsAt: attrs.trial_ends_at ? new Date(attrs.trial_ends_at) : null,
+      },
+    });
   });
 
-  console.log(`Subscription ${data.id} updated: ${attrs.status}`);
+  console.log(`[Webhook] Subscription ${data.id} updated: ${attrs.status}`);
 }
 
 /**
- * Handle subscription cancelled (set to cancel at period end)
+ * Handle subscription cancelled (set to cancel at period end) (transactional)
  */
 async function handleSubscriptionCancelled(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
 
-  await prisma.subscription.updateMany({
-    where: { lemonSqueezySubscriptionId: data.id },
-    data: {
-      status: attrs.status,
-      cancelAtPeriodEnd: true,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.updateMany({
+      where: { lemonSqueezySubscriptionId: data.id },
+      data: {
+        status: attrs.status,
+        cancelAtPeriodEnd: true,
+      },
+    });
   });
 
-  console.log(`Subscription ${data.id} cancelled (will end at period end)`);
+  console.log(`[Webhook] Subscription ${data.id} cancelled (will end at period end)`);
 }
 
 /**
- * Handle subscription resumed
+ * Handle subscription resumed (transactional)
  */
 async function handleSubscriptionResumed(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
 
-  await prisma.subscription.updateMany({
-    where: { lemonSqueezySubscriptionId: data.id },
-    data: {
-      status: attrs.status,
-      cancelAtPeriodEnd: false,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.updateMany({
+      where: { lemonSqueezySubscriptionId: data.id },
+      data: {
+        status: attrs.status,
+        cancelAtPeriodEnd: false,
+      },
+    });
   });
 
-  console.log(`Subscription ${data.id} resumed`);
+  console.log(`[Webhook] Subscription ${data.id} resumed`);
 }
 
 /**
- * Handle subscription expired
+ * Handle subscription expired (transactional)
  */
 async function handleSubscriptionExpired(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
 
-  await prisma.subscription.updateMany({
-    where: { lemonSqueezySubscriptionId: data.id },
-    data: {
-      status: 'expired',
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.updateMany({
+      where: { lemonSqueezySubscriptionId: data.id },
+      data: {
+        status: 'expired',
+      },
+    });
   });
 
-  console.log(`Subscription ${data.id} expired`);
+  console.log(`[Webhook] Subscription ${data.id} expired`);
 }
 
 /**
- * Handle subscription paused
+ * Handle subscription paused (transactional)
  */
 async function handleSubscriptionPaused(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
 
-  await prisma.subscription.updateMany({
-    where: { lemonSqueezySubscriptionId: data.id },
-    data: {
-      status: 'paused',
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.updateMany({
+      where: { lemonSqueezySubscriptionId: data.id },
+      data: {
+        status: 'paused',
+      },
+    });
   });
 
-  console.log(`Subscription ${data.id} paused`);
+  console.log(`[Webhook] Subscription ${data.id} paused`);
 }
 
 /**
- * Handle subscription unpaused
+ * Handle subscription unpaused (transactional)
  */
 async function handleSubscriptionUnpaused(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
 
-  await prisma.subscription.updateMany({
-    where: { lemonSqueezySubscriptionId: data.id },
-    data: {
-      status: attrs.status,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.subscription.updateMany({
+      where: { lemonSqueezySubscriptionId: data.id },
+      data: {
+        status: attrs.status,
+      },
+    });
   });
 
-  console.log(`Subscription ${data.id} unpaused`);
+  console.log(`[Webhook] Subscription ${data.id} unpaused`);
 }
 
 /**
- * Handle successful payment
+ * Handle successful payment (transactional)
  */
 async function handlePaymentSuccess(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
 
-  // Update status to active if it was past_due
-  await prisma.subscription.updateMany({
-    where: {
-      lemonSqueezySubscriptionId: data.id,
-      status: 'past_due',
-    },
-    data: {
-      status: 'active',
-      currentPeriodEnd: attrs.renews_at ? new Date(attrs.renews_at) : undefined,
-    },
+  await prisma.$transaction(async (tx) => {
+    // Update status to active if it was past_due
+    await tx.subscription.updateMany({
+      where: {
+        lemonSqueezySubscriptionId: data.id,
+        status: 'past_due',
+      },
+      data: {
+        status: 'active',
+        currentPeriodEnd: attrs.renews_at ? new Date(attrs.renews_at) : undefined,
+      },
+    });
   });
 
-  console.log(`Payment succeeded for subscription ${data.id}`);
+  console.log(`[Webhook] Payment succeeded for subscription ${data.id}`);
 }
 
 /**
