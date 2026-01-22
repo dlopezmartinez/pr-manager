@@ -17,16 +17,59 @@
       <a href="/docs" class="text-sm text-gray-600 hover:text-gray-900 transition-colors">Docs</a>
     </div>
 
-    <div class="flex items-center gap-4">
+    <!-- Guest Navigation -->
+    <div id="guest-nav" class="flex items-center gap-4">
       <a href="/login" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
         Sign In
       </a>
       <a
-        href="#pricing"
+        href="/signup"
         class="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors"
       >
         Start Free Trial
       </a>
     </div>
+
+    <!-- Authenticated Navigation (hidden by default) -->
+    <div id="auth-nav" class="hidden items-center gap-4">
+      <a href="/success" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+        Downloads
+      </a>
+      <button
+        id="logout-btn"
+        class="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+      >
+        Sign Out
+      </button>
+    </div>
   </nav>
 </header>
+
+<script>
+  // Check authentication state and update navigation
+  function updateNav() {
+    const token = localStorage.getItem('pr_manager_token');
+    const guestNav = document.getElementById('guest-nav');
+    const authNav = document.getElementById('auth-nav');
+
+    if (token) {
+      guestNav?.classList.add('hidden');
+      authNav?.classList.remove('hidden');
+      authNav?.classList.add('flex');
+    } else {
+      guestNav?.classList.remove('hidden');
+      authNav?.classList.add('hidden');
+      authNav?.classList.remove('flex');
+    }
+  }
+
+  // Handle logout
+  document.getElementById('logout-btn')?.addEventListener('click', () => {
+    localStorage.removeItem('pr_manager_token');
+    localStorage.removeItem('pr_manager_user');
+    window.location.href = '/';
+  });
+
+  // Run on load
+  updateNav();
+</script>

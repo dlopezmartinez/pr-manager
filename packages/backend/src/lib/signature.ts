@@ -1,0 +1,125 @@
+import crypto from 'crypto';
+
+const DOWNLOAD_SECRET = process.env.DOWNLOAD_SECRET || 'default-download-secret-change-in-production';
+
+export interface SignedUrlParams {
+  userId: string;
+  platform: 'mac' | 'windows' | 'linux-deb' | 'linux-rpm';
+  version: string;
+}
+
+/**
+ * Generate a signed download URL for a specific user, platform, and version
+ * The URL expires after the specified duration (default 30 minutes)
+ */
+export function generateSignedDownloadUrl(
+  params: SignedUrlParams,
+  baseUrl: string,
+  expiresInMs: number = 30 * 60 * 1000 // 30 minutes default
+): string {
+  const { userId, platform, version } = params;
+  const expires = Date.now() + expiresInMs;
+
+  const data = `${userId}:${platform}:${version}:${expires}`;
+  const signature = crypto
+    .createHmac('sha256', DOWNLOAD_SECRET)
+    .update(data)
+    .digest('hex');
+
+  const url = new URL(`${baseUrl}/download/${platform}/${version}`);
+  url.searchParams.set('signature', signature);
+  url.searchParams.set('expires', expires.toString());
+  url.searchParams.set('user', userId);
+
+  return url.toString();
+}
+
+/**
+ * Verify a signed download URL
+ * Returns true if the signature is valid and not expired
+ */
+export function verifySignedDownload(
+  userId: string,
+  platform: string,
+  version: string,
+  signature: string,
+  expires: string
+): { valid: boolean; error?: string } {
+  const expiresNum = parseInt(expires, 10);
+
+  // Check if expires is a valid number
+  if (isNaN(expiresNum)) {
+    return { valid: false, error: 'Invalid expiration timestamp' };
+  }
+
+  // Check expiration
+  if (Date.now() > expiresNum) {
+    return { valid: false, error: 'Download link has expired' };
+  }
+
+  // Verify signature
+  const data = `${userId}:${platform}:${version}:${expires}`;
+  const expectedSignature = crypto
+    .createHmac('sha256', DOWNLOAD_SECRET)
+    .update(data)
+    .digest('hex');
+
+  // Use timing-safe comparison to prevent timing attacks
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+
+  if (signatureBuffer.length !== expectedBuffer.length) {
+    return { valid: false, error: 'Invalid signature' };
+  }
+
+  const isValid = crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+
+  if (!isValid) {
+    return { valid: false, error: 'Invalid signature' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Get the GitHub release download URL for a specific platform and version
+ */
+export function getGitHubReleaseUrl(platform: string, version: string): string {
+  const baseUrl = process.env.GITHUB_RELEASES_BASE_URL ||
+    'https://github.com/dlopezmartinez/pr-manager/releases/download';
+
+  const fileNames: Record<string, string> = {
+    'mac': `PR-Manager-${version}.dmg`,
+    'windows': `PRManager-${version}-Setup.exe`,
+    'linux-deb': `pr-manager_${version}_amd64.deb`,
+    'linux-rpm': `pr-manager-${version}.x86_64.rpm`,
+  };
+
+  const fileName = fileNames[platform];
+  if (!fileName) {
+    throw new Error(`Unknown platform: ${platform}`);
+  }
+
+  return `${baseUrl}/v${version}/${fileName}`;
+}
+
+/**
+ * Generate all signed download URLs for a user and version
+ */
+export function generateAllSignedUrls(
+  userId: string,
+  version: string,
+  baseUrl: string
+): {
+  mac: string;
+  windows: string;
+  linuxDeb: string;
+  linuxRpm: string;
+} {
+  return {
+    mac: generateSignedDownloadUrl({ userId, platform: 'mac', version }, baseUrl),
+    windows: generateSignedDownloadUrl({ userId, platform: 'windows', version }, baseUrl),
+    linuxDeb: generateSignedDownloadUrl({ userId, platform: 'linux-deb', version }, baseUrl),
+    linuxRpm: generateSignedDownloadUrl({ userId, platform: 'linux-rpm', version }, baseUrl),
+  };
+}

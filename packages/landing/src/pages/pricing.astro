@@ -192,37 +192,19 @@ const plans = [
 </Layout>
 
 <script>
-  const API_URL = 'https://api.prmanager.app';
-
   document.querySelectorAll('.checkout-btn').forEach((button) => {
-    button.addEventListener('click', async () => {
+    button.addEventListener('click', () => {
       const priceId = button.getAttribute('data-price-id');
-      const originalText = button.textContent;
 
-      button.textContent = 'Loading...';
-      button.disabled = true;
+      // Check if user is already logged in
+      const token = localStorage.getItem('pr_manager_token');
 
-      try {
-        const response = await fetch(`${API_URL}/checkout/create`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ priceId }),
-        });
-
-        const data = await response.json();
-
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          throw new Error('No checkout URL returned');
-        }
-      } catch (error) {
-        console.error('Checkout error:', error);
-        alert('Something went wrong. Please try again.');
-        button.textContent = originalText;
-        button.disabled = false;
+      if (token) {
+        // If logged in, go directly to checkout
+        window.location.href = `/checkout?plan=${priceId}`;
+      } else {
+        // If not logged in, go to signup first
+        window.location.href = `/signup?plan=${priceId}`;
       }
     });
   });

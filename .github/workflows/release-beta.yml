@@ -1,0 +1,188 @@
+name: "🧪 Beta Release (No Auth)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Beta version (e.g., 1.0.0-beta.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  beta-release:
+    name: "📦 Create Beta Release"
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "🔧 Setup Git"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: "📗 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: "📝 Update package.json version"
+        run: |
+          npm version ${{ inputs.version }} --no-git-tag-version
+          echo "✅ Updated version to ${{ inputs.version }}"
+
+      - name: "💾 Commit version bump"
+        run: |
+          git add package.json package-lock.json
+          git commit -m "chore(release): 🧪 v${{ inputs.version }} [beta]" || echo "No changes to commit"
+          git push origin ${{ github.ref_name }}
+
+      - name: "🏷️ Create and push beta tag"
+        run: |
+          git tag -a "v${{ inputs.version }}" -m "Beta Release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: "📢 Create GitHub Release (Prerelease)"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ inputs.version }}
+          name: "🧪 v${{ inputs.version }} (Beta - No Auth Required)"
+          body: |
+            ## 🧪 Beta Release v${{ inputs.version }}
+
+            **⚠️ This is a BETA release for testing purposes**
+
+            ### Key Features
+            - 🔓 **No authentication required** - Skip login for quick testing
+            - 🔓 **No subscription required** - Full access without payment
+            - 🧪 For beta testers and development only
+
+            ### How to Use
+            1. Download the app for your platform below
+            2. Install and launch - no signup needed
+            3. Connect your GitHub/GitLab account directly
+            4. Start testing!
+
+            ### Important Notes
+            - This build has `VITE_SKIP_AUTH=true` enabled
+            - Not for production use
+            - Features may be unstable
+            - Report bugs via GitHub Issues
+
+            ---
+
+            ### 📥 Downloads
+
+            | Platform | File |
+            |----------|------|
+            | macOS | `PR-Manager-${{ inputs.version }}.dmg` |
+            | Windows | `PRManager-${{ inputs.version }}-Setup.exe` |
+            | Linux | `pr-manager_${{ inputs.version }}_amd64.deb` / `.rpm` |
+
+            ---
+
+            📦 *Beta release - Not for production*
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  build:
+    name: "🔨 Build ${{ matrix.platform }} (No Auth)"
+    needs: beta-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macOS
+          - os: windows-latest
+            platform: Windows
+          - os: ubuntu-latest
+            platform: Linux
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.beta-release.outputs.version }}
+
+      - name: "📗 Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: "📦 Install dependencies"
+        run: npm ci
+
+      - name: "🐧 Install Linux dependencies"
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install -y dpkg fakeroot rpm
+
+      - name: "🔧 Create .env.production with VITE_SKIP_AUTH"
+        shell: bash
+        run: |
+          echo "VITE_SKIP_AUTH=true" > packages/app/.env.production
+          echo "✅ VITE_SKIP_AUTH enabled for beta build"
+          cat packages/app/.env.production
+
+      - name: "🍎 Build macOS (Beta)"
+        if: matrix.os == 'macos-latest'
+        run: npm run app:make:mac
+        env:
+          VITE_SKIP_AUTH: 'true'
+
+      - name: "🪟 Build Windows (Beta)"
+        if: matrix.os == 'windows-latest'
+        run: npm run app:make:win
+        env:
+          VITE_SKIP_AUTH: 'true'
+
+      - name: "🐧 Build Linux (Beta)"
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run app:make:linux
+        env:
+          VITE_SKIP_AUTH: 'true'
+
+      - name: "📤 Upload macOS assets"
+        if: matrix.os == 'macos-latest'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.beta-release.outputs.version }}
+          files: |
+            packages/app/out/make/*.dmg
+            packages/app/out/make/zip/darwin/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "📤 Upload Windows assets"
+        if: matrix.os == 'windows-latest'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.beta-release.outputs.version }}
+          files: |
+            packages/app/out/make/squirrel.windows/**/*.exe
+            packages/app/out/make/squirrel.windows/**/*.nupkg
+            packages/app/out/make/zip/win32/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "📤 Upload Linux assets"
+        if: matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.beta-release.outputs.version }}
+          files: |
+            packages/app/out/make/deb/x64/*.deb
+            packages/app/out/make/rpm/x64/*.rpm
+            packages/app/out/make/zip/linux/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}

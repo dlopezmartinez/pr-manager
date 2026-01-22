@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { LEMONSQUEEZY_CONFIG, lemonSqueezyFetch, LemonSqueezyResponse, LemonSqueezyCheckout } from '../lib/lemonsqueezy.js';
+import { prisma } from '../lib/prisma.js';
+import { generateToken } from '../middleware/auth.js';
+import { generateAllSignedUrls } from '../lib/signature.js';
 
 const router = Router();
 
@@ -97,6 +100,171 @@ router.post('/create', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Create public checkout error:', error);
     res.status(500).json({ error: 'Failed to create checkout session' });
+  }
+});
+
+/**
+ * POST /checkout/verify-session
+ * Verify a checkout session after payment and return user token + download URLs
+ * This is called by the success page after LemonSqueezy redirects back
+ */
+router.post('/verify-session', async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      email: z.string().email(),
+    });
+
+    const validation = schema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({
+        error: 'Email is required',
+        details: validation.error.errors,
+      });
+      return;
+    }
+
+    const { email } = validation.data;
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { subscription: true },
+    });
+
+    if (!user) {
+      res.status(404).json({
+        error: 'User not found. Please create an account first.',
+        needsSignup: true,
+      });
+      return;
+    }
+
+    // Check subscription status - may need to poll for webhook
+    let subscription = user.subscription;
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    // Poll for subscription if not found (webhook may take a moment)
+    while (!subscription && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      subscription = await prisma.subscription.findUnique({
+        where: { userId: user.id },
+      });
+      attempts++;
+    }
+
+    if (!subscription) {
+      res.status(404).json({
+        error: 'Subscription not found. Please try again in a moment.',
+        processing: true,
+      });
+      return;
+    }
+
+    // Check if subscription is active
+    const activeStatuses = ['active', 'on_trial'];
+    if (!activeStatuses.includes(subscription.status)) {
+      res.status(403).json({
+        error: 'Subscription is not active',
+        status: subscription.status,
+      });
+      return;
+    }
+
+    // Generate JWT token
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+    });
+
+    // Get current version (from env or default)
+    const currentVersion = process.env.CURRENT_APP_VERSION || '1.0.0';
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://api.prmanager.app';
+
+    // Generate signed download URLs
+    const downloadUrls = generateAllSignedUrls(user.id, currentVersion, apiBaseUrl);
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      subscription: {
+        active: true,
+        status: subscription.status,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        isTrialing: subscription.status === 'on_trial',
+        trialEndsAt: subscription.trialEndsAt,
+      },
+      downloads: downloadUrls,
+      version: currentVersion,
+    });
+  } catch (error) {
+    console.error('Verify session error:', error);
+    res.status(500).json({ error: 'Failed to verify session' });
+  }
+});
+
+/**
+ * GET /checkout/downloads
+ * Get signed download URLs for authenticated users
+ * Requires Bearer token authentication
+ */
+router.get('/downloads', async (req: Request, res: Response) => {
+  try {
+    // Get token from header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Authorization required' });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+
+    // Verify token manually (without middleware to handle custom response)
+    const jwt = await import('jsonwebtoken');
+    let decoded: { userId: string; email: string };
+
+    try {
+      decoded = jwt.default.verify(token, process.env.JWT_SECRET!) as { userId: string; email: string };
+    } catch {
+      res.status(401).json({ error: 'Invalid or expired token' });
+      return;
+    }
+
+    // Check subscription
+    const subscription = await prisma.subscription.findUnique({
+      where: { userId: decoded.userId },
+    });
+
+    if (!subscription) {
+      res.status(403).json({ error: 'No subscription found' });
+      return;
+    }
+
+    const activeStatuses = ['active', 'on_trial'];
+    if (!activeStatuses.includes(subscription.status)) {
+      res.status(403).json({
+        error: 'Subscription is not active',
+        status: subscription.status,
+      });
+      return;
+    }
+
+    const currentVersion = process.env.CURRENT_APP_VERSION || '1.0.0';
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://api.prmanager.app';
+
+    const downloadUrls = generateAllSignedUrls(decoded.userId, currentVersion, apiBaseUrl);
+
+    res.json({
+      downloads: downloadUrls,
+      version: currentVersion,
+    });
+  } catch (error) {
+    console.error('Get downloads error:', error);
+    res.status(500).json({ error: 'Failed to get download URLs' });
   }
 });
 

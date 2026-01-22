@@ -6,6 +6,7 @@ import authRoutes from './routes/auth.js';
 import subscriptionRoutes from './routes/subscription.js';
 import webhookRoutes from './routes/webhook.js';
 import checkoutRoutes from './routes/checkout.js';
+import downloadRoutes from './routes/download.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -42,6 +43,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.use('/auth', authRoutes);
 app.use('/subscription', subscriptionRoutes);
 app.use('/checkout', checkoutRoutes);
+app.use('/download', downloadRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
