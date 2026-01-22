@@ -6,6 +6,7 @@ import {
   logWebhookEvent,
   markWebhookProcessed,
   logWebhookError,
+  getWebhookEvent,
 } from '../services/webhookAudit.js';
 
 const router = Router();
@@ -28,7 +29,15 @@ router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res
     // PASO 1: LOG INMEDIATAMENTE (antes de procesar)
     webhookEventId = await logWebhookEvent(eventId, eventName, event.data);
 
-    // PASO 2: Procesamiento (con try-catch)
+    // PASO 2: CHECK IDEMPOTENCY - si ya fue procesado, skip processing
+    const existingEvent = await getWebhookEvent(webhookEventId);
+    if (existingEvent?.processed === true) {
+      console.log(`[Webhook] Event already processed (idempotent), skipping: ${eventId}`);
+      res.json({ received: true, eventId: webhookEventId, cached: true });
+      return;
+    }
+
+    // PASO 3: Procesamiento (con try-catch)
     switch (eventName) {
       case 'subscription_created':
         await handleSubscriptionCreated(event);
@@ -70,10 +79,10 @@ router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res
         console.log(`[Webhook] Unhandled event type: ${eventName}`);
     }
 
-    // PASO 3: Mark as processed successfully
+    // PASO 4: Mark as processed successfully
     await markWebhookProcessed(webhookEventId);
 
-    // PASO 4: SIEMPRE respond 200 (LemonSqueezy requirement)
+    // PASO 5: SIEMPRE respond 200 (LemonSqueezy requirement)
     res.json({ received: true, eventId: webhookEventId });
   } catch (error) {
     console.error(`[Webhook] Error handling ${eventName}:`, error);
