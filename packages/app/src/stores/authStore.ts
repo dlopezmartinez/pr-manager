@@ -7,6 +7,9 @@ import { reactive, computed, readonly } from 'vue';
 import { authService, type SubscriptionStatus } from '../services/authService';
 import type { AuthUser } from '../preload';
 
+// Check if auth should be skipped (for development/beta testing)
+const SKIP_AUTH = import.meta.env.VITE_SKIP_AUTH === 'true';
+
 interface AuthState {
   initialized: boolean;
   isAuthenticated: boolean;
@@ -61,6 +64,17 @@ async function initialize(): Promise<void> {
 
   state.isLoading = true;
   state.error = null;
+
+  // Skip auth for development/beta testing
+  if (SKIP_AUTH) {
+    console.log('[Auth] Skipping authentication (VITE_SKIP_AUTH=true)');
+    state.isAuthenticated = true;
+    state.user = { id: 'dev-user', email: 'dev@prmanager.app', name: 'Developer' };
+    state.subscription = { active: true, status: 'active', isTrialing: false };
+    state.initialized = true;
+    state.isLoading = false;
+    return;
+  }
 
   try {
     // Initialize auth service (loads stored token)
