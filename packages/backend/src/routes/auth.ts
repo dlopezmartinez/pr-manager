@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { createHash } from 'crypto';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { generateToken, authenticate, JWTPayload } from '../middleware/auth.js';
+import { generateToken, generateTokens, verifyRefreshToken, authenticate, JWTPayload } from '../middleware/auth.js';
 import { loginLimiter, signupLimiter, passwordChangeLimiter } from '../middleware/rateLimit.js';
 
 const router = Router();
@@ -72,15 +73,17 @@ router.post('/signup', signupLimiter, async (req: Request, res: Response) => {
       });
     });
 
-    // Generate JWT token
-    const token = generateToken({
+    // Generate Access Token + Refresh Token
+    const tokens = await generateTokens({
       userId: user.id,
       email: user.email,
       role: user.role,
     });
 
     res.status(201).json({
-      token,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
       user: {
         id: user.id,
         email: user.email,
@@ -135,15 +138,17 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
       return;
     }
 
-    // Generate JWT token
-    const token = generateToken({
+    // Generate Access Token + Refresh Token
+    const tokens = await generateTokens({
       userId: user.id,
       email: user.email,
       role: user.role,
     });
 
     res.json({
-      token,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
       user: {
         id: user.id,
         email: user.email,
@@ -333,6 +338,126 @@ router.post('/change-password', authenticate, passwordChangeLimiter, async (req:
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
+/**
+ * POST /auth/refresh
+ * Refresh access token using refresh token
+ */
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      refreshToken: z.string().min(1, 'Refresh token is required'),
+    });
+
+    const validation = schema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: validation.error.errors,
+      });
+      return;
+    }
+
+    const { refreshToken } = validation.data;
+
+    // Verify refresh token and get user ID
+    const userId = await verifyRefreshToken(refreshToken);
+    if (!userId) {
+      res.status(401).json({
+        error: 'Invalid or expired refresh token',
+        code: 'REFRESH_TOKEN_INVALID',
+      });
+      return;
+    }
+
+    // Get user details
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Generate new tokens (new access token, new refresh token)
+    const tokens = await generateTokens({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    res.json({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresIn: tokens.expiresIn,
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+/**
+ * POST /auth/logout
+ * Invalidate a single refresh token (logout from one device)
+ */
+router.post('/logout', authenticate, async (req: Request, res: Response) => {
+  try {
+    const schema = z.object({
+      refreshToken: z.string().min(1, 'Refresh token is required'),
+    });
+
+    const validation = schema.safeParse(req.body);
+    if (!validation.success) {
+      // If no refresh token provided, still succeed (client cleanup)
+      res.json({ message: 'Logged out' });
+      return;
+    }
+
+    const { refreshToken } = validation.data;
+
+    // Hash token to match DB storage
+    const tokenHash = createHash('sha256').update(refreshToken).digest('hex');
+
+    // Delete the session
+    await prisma.session.deleteMany({
+      where: {
+        token: tokenHash,
+        userId: req.user!.userId,
+      },
+    });
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ error: 'Failed to logout' });
+  }
+});
+
+/**
+ * POST /auth/logout-all
+ * Invalidate ALL refresh tokens for this user (logout from all devices)
+ */
+router.post('/logout-all', authenticate, async (req: Request, res: Response) => {
+  try {
+    // Delete all sessions for this user
+    await prisma.session.deleteMany({
+      where: { userId: req.user!.userId },
+    });
+
+    res.json({ message: 'Logged out from all devices' });
+  } catch (error) {
+    console.error('Logout all error:', error);
+    res.status(500).json({ error: 'Failed to logout from all devices' });
   }
 });
 
