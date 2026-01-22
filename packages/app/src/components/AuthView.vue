@@ -229,9 +229,9 @@ function openExternal(url: string) {
   justify-content: center;
   width: 64px;
   height: 64px;
-  background: var(--color-accent);
-  border-radius: 16px;
-  color: white;
+  background: var(--color-accent-primary);
+  border-radius: var(--radius-xl);
+  color: var(--color-text-inverted);
   margin-bottom: 16px;
 }
 
@@ -250,8 +250,8 @@ function openExternal(url: string) {
 
 .auth-form {
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-xl);
   padding: 24px;
 }
 
@@ -284,17 +284,17 @@ function openExternal(url: string) {
   width: 100%;
   padding: 10px 12px;
   font-size: 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-md);
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
-  transition: border-color 0.2s, box-shadow 0.2s;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(var(--color-accent-rgb), 0.1);
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px var(--color-accent-lighter);
 }
 
 .form-group input::placeholder {
@@ -308,10 +308,10 @@ function openExternal(url: string) {
 
 .error-message {
   padding: 10px 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 8px;
-  color: #ef4444;
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
   font-size: 13px;
   margin-bottom: 16px;
 }
@@ -320,13 +320,13 @@ function openExternal(url: string) {
   width: 100%;
   padding: 12px 16px;
   font-size: 14px;
-  font-weight: 500;
-  color: white;
-  background: var(--color-accent);
+  font-weight: 600;
+  color: var(--color-text-inverted);
+  background: var(--color-accent-primary);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition: background var(--transition-fast), transform 0.1s;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -350,7 +350,7 @@ function openExternal(url: string) {
 }
 
 .form-footer a {
-  color: var(--color-accent);
+  color: var(--color-accent-text);
   text-decoration: none;
   font-weight: 500;
 }

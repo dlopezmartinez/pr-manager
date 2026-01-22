@@ -106,22 +106,22 @@ async function handleUpgrade() {
   padding: 8px 12px;
   gap: 12px;
   font-size: 12px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-primary);
 }
 
 .trial-banner.info {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: var(--color-accent-lighter);
+  color: var(--color-accent-primary);
 }
 
 .trial-banner.warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 .trial-banner.urgent {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: var(--color-error-bg);
+  color: var(--color-error);
 }
 
 .banner-content {
@@ -143,12 +143,11 @@ async function handleUpgrade() {
   padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;
-  color: white;
-  background: currentColor;
+  color: var(--color-text-inverted);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-fast);
 }
 
 .banner-action:hover {
@@ -156,14 +155,14 @@ async function handleUpgrade() {
 }
 
 .trial-banner.info .banner-action {
-  background: #3b82f6;
+  background: var(--color-accent-primary);
 }
 
 .trial-banner.warning .banner-action {
-  background: #f59e0b;
+  background: var(--color-warning);
 }
 
 .trial-banner.urgent .banner-action {
-  background: #ef4444;
+  background: var(--color-error);
 }
 </style>

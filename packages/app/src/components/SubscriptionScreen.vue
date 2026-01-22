@@ -181,8 +181,8 @@ async function handleLogout() {
 
 .subscription-content {
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-xl);
   padding: 32px 24px;
   text-align: center;
 }
@@ -193,18 +193,18 @@ async function handleLogout() {
   justify-content: center;
   width: 64px;
   height: 64px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   margin-bottom: 16px;
 }
 
 .icon-container.warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 .icon-container.success {
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
+  background: var(--color-success-bg);
+  color: var(--color-success);
 }
 
 .subscription-content h2 {
@@ -231,10 +231,10 @@ async function handleLogout() {
 .pricing-card {
   position: relative;
   padding: 16px;
-  border: 2px solid var(--color-border);
-  border-radius: 10px;
+  border: 2px solid var(--color-border-primary);
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.1s;
+  transition: border-color var(--transition-fast), transform 0.1s;
 }
 
 .pricing-card:hover {
@@ -242,8 +242,8 @@ async function handleLogout() {
 }
 
 .pricing-card.selected {
-  border-color: var(--color-accent);
-  background: rgba(var(--color-accent-rgb), 0.05);
+  border-color: var(--color-accent-primary);
+  background: var(--color-accent-lighter);
 }
 
 .pricing-card.featured .badge {
@@ -252,11 +252,11 @@ async function handleLogout() {
   left: 50%;
   transform: translateX(-50%);
   padding: 2px 8px;
-  background: var(--color-accent);
-  color: white;
+  background: var(--color-accent-primary);
+  color: var(--color-text-inverted);
   font-size: 10px;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   text-transform: uppercase;
 }
 
@@ -289,13 +289,13 @@ async function handleLogout() {
   width: 100%;
   padding: 12px 16px;
   font-size: 14px;
-  font-weight: 500;
-  color: white;
-  background: var(--color-accent);
+  font-weight: 600;
+  color: var(--color-text-inverted);
+  background: var(--color-accent-primary);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition: background var(--transition-fast), transform 0.1s;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -318,10 +318,10 @@ async function handleLogout() {
   font-weight: 500;
   color: var(--color-text-primary);
   background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: 1px solid var(--color-border-primary);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition: background var(--transition-fast), transform 0.1s;
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -342,10 +342,10 @@ async function handleLogout() {
 .error-message {
   margin-top: 16px;
   padding: 10px 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 8px;
-  color: #ef4444;
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
   font-size: 13px;
 }
 

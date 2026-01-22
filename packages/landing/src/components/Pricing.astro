@@ -113,14 +113,38 @@ const plans = [
 </section>
 
 <script>
-  // Stripe checkout integration
+  const API_URL = 'https://api.prmanager.app';
+
   document.querySelectorAll('[data-price-id]').forEach((button) => {
     button.addEventListener('click', async () => {
       const priceId = button.getAttribute('data-price-id');
+      const originalText = button.textContent;
 
-      // In production, this would create a checkout session via your backend
-      // For now, redirect to signup
-      window.location.href = `/signup?plan=${priceId}`;
+      button.textContent = 'Loading...';
+      button.disabled = true;
+
+      try {
+        const response = await fetch(`${API_URL}/checkout/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ priceId }),
+        });
+
+        const data = await response.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error('No checkout URL returned');
+        }
+      } catch (error) {
+        console.error('Checkout error:', error);
+        alert('Something went wrong. Please try again.');
+        button.textContent = originalText;
+        button.disabled = false;
+      }
     });
   });
 </script>
