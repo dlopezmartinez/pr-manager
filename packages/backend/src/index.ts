@@ -9,6 +9,7 @@ import checkoutRoutes from './routes/checkout.js';
 import downloadRoutes from './routes/download.js';
 import { scheduleDaily, startScheduler, getSchedulerStatus } from './services/scheduler.js';
 import { runSubscriptionSync } from './jobs/syncSubscriptions.js';
+import { processWebhookQueue } from './jobs/processWebhookQueue.js';
 import {
   loginLimiter,
   signupLimiter,
@@ -88,6 +89,9 @@ app.listen(PORT, () => {
   // Register and start scheduled jobs
   // Sync subscriptions daily at 2:00 AM UTC
   scheduleDaily('syncSubscriptions', runSubscriptionSync, 2);
+
+  // Process webhook queue daily at 1:00 AM UTC
+  scheduleDaily('processWebhookQueue', processWebhookQueue, 1);
 
   // Start the scheduler
   startScheduler();

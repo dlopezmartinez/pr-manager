@@ -1,21 +1,34 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma.js';
 import { verifyLemonSqueezyWebhook, LemonSqueezyWebhookEvent } from '../middleware/lemonsqueezy.js';
+import { authenticate } from '../middleware/auth.js';
+import {
+  logWebhookEvent,
+  markWebhookProcessed,
+  logWebhookError,
+} from '../services/webhookAudit.js';
 
 const router = Router();
 
 /**
  * POST /webhooks/lemonsqueezy
- * Handle LemonSqueezy webhook events
+ * Handle LemonSqueezy webhook events with audit trail
  * Note: This route uses raw body parsing for signature verification
  */
 router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res: Response) => {
   const event = req.lemonSqueezyEvent!;
   const eventName = event.meta.event_name;
+  const eventId = event.data.id; // LemonSqueezy event ID for deduplication
 
-  console.log(`Received LemonSqueezy webhook: ${eventName}`);
+  console.log(`[Webhook] Received: ${eventName} (${eventId})`);
+
+  let webhookEventId: string = '';
 
   try {
+    // PASO 1: LOG INMEDIATAMENTE (antes de procesar)
+    webhookEventId = await logWebhookEvent(eventId, eventName, event.data);
+
+    // PASO 2: Procesamiento (con try-catch)
     switch (eventName) {
       case 'subscription_created':
         await handleSubscriptionCreated(event);
@@ -54,14 +67,29 @@ router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res
         break;
 
       default:
-        console.log(`Unhandled event type: ${eventName}`);
+        console.log(`[Webhook] Unhandled event type: ${eventName}`);
     }
 
-    res.json({ received: true });
+    // PASO 3: Mark as processed successfully
+    await markWebhookProcessed(webhookEventId);
+
+    // PASO 4: SIEMPRE respond 200 (LemonSqueezy requirement)
+    res.json({ received: true, eventId: webhookEventId });
   } catch (error) {
-    console.error(`Error handling webhook ${eventName}:`, error);
-    // Return 200 to prevent LemonSqueezy from retrying
-    res.json({ received: true, error: 'Handler error' });
+    console.error(`[Webhook] Error handling ${eventName}:`, error);
+
+    // Log error to audit trail (pero no re-throw)
+    if (webhookEventId) {
+      await logWebhookError(webhookEventId, error as Error, true);
+    }
+
+    // IMPORTANTE: Still return 200 to LemonSqueezy
+    // Error is logged in audit trail and will be retried
+    res.json({
+      received: true,
+      eventId: webhookEventId,
+      warning: 'Processing failed but logged for retry',
+    });
   }
 });
 
@@ -259,5 +287,105 @@ async function handlePaymentFailed(event: LemonSqueezyWebhookEvent): Promise<voi
   //   await sendEmail(subscription.user.email, 'payment_failed', {});
   // }
 }
+
+// Helper to safely extract query params
+function getQueryString(value: string | string[] | undefined): string | undefined {
+  if (!value) return undefined;
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getQueryNumber(value: string | string[] | undefined, defaultValue: number): number {
+  const str = getQueryString(value);
+  if (!str) return defaultValue;
+  const num = parseInt(str, 10);
+  return isNaN(num) ? defaultValue : num;
+}
+
+/**
+ * GET /webhooks/audit/events
+ * List all webhook events (with pagination)
+ * Admin only (requires authentication)
+ */
+router.get('/audit/events', authenticate, async (req: Request, res: Response) => {
+  try {
+    const skip = getQueryNumber(req.query.skip as any, 0);
+    const take = Math.min(getQueryNumber(req.query.take as any, 100), 100);
+    const processedParam = getQueryString(req.query.processed as any);
+
+    const where: any = {};
+    if (processedParam === 'true') where.processed = true;
+    if (processedParam === 'false') where.processed = false;
+
+    const events = await prisma.webhookEvent.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+    });
+
+    res.json(events);
+  } catch (error) {
+    console.error('[Webhook] Error fetching audit events:', error);
+    res.status(500).json({ error: 'Failed to fetch audit events' });
+  }
+});
+
+/**
+ * GET /webhooks/audit/events/:id
+ * Get specific webhook event details
+ */
+router.get('/audit/events/:id', authenticate, async (req: Request, res: Response) => {
+  try {
+    const id = typeof req.params.id === 'string' ? req.params.id : req.params.id[0];
+    const event = await prisma.webhookEvent.findUnique({
+      where: { id },
+      include: { queueItem: true },
+    });
+
+    if (!event) {
+      res.status(404).json({ error: 'Webhook event not found' });
+      return;
+    }
+
+    res.json(event);
+  } catch (error) {
+    console.error('[Webhook] Error fetching event details:', error);
+    res.status(500).json({ error: 'Failed to fetch event details' });
+  }
+});
+
+/**
+ * POST /webhooks/audit/events/:id/replay
+ * Replay a failed webhook
+ * Admin only (requires authentication)
+ */
+router.post('/audit/events/:id/replay', authenticate, async (req: Request, res: Response) => {
+  try {
+    const id = typeof req.params.id === 'string' ? req.params.id : req.params.id[0];
+    const event = await prisma.webhookEvent.findUnique({
+      where: { id },
+    });
+
+    if (!event) {
+      res.status(404).json({ error: 'Webhook event not found' });
+      return;
+    }
+
+    // Reset for reprocessing
+    await prisma.webhookEvent.update({
+      where: { id },
+      data: {
+        processed: false,
+        error: null,
+        errorCount: 0,
+      },
+    });
+
+    res.json({ message: 'Webhook queued for replay', eventId: id });
+  } catch (error) {
+    console.error('[Webhook] Error replaying event:', error);
+    res.status(500).json({ error: 'Failed to replay event' });
+  }
+});
 
 export default router;

@@ -66,3 +66,47 @@ model Session {
   @@index([userId])
   @@map("sessions")
 }
+
+model WebhookEvent {
+  id              String   @id @default(cuid())
+  eventId         String   @unique @map("event_id")
+  eventName       String   @map("event_name")
+
+  // Guardar payload completo para audit/replay
+  data            Json
+
+  // Estado del procesamiento
+  processed       Boolean  @default(false)
+  processedAt     DateTime? @map("processed_at")
+
+  // Error tracking
+  error           String?
+  errorCount      Int      @default(0) @map("error_count")
+
+  // Relación con retry queue
+  queueItem       WebhookQueue?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([eventName])
+  @@index([processed])
+  @@index([createdAt])
+  @@index([eventId])
+  @@map("webhook_events")
+}
+
+model WebhookQueue {
+  id              String   @id @default(cuid())
+  webhookEventId  String   @unique @map("webhook_event_id")
+  webhookEvent    WebhookEvent @relation(fields: [webhookEventId], references: [id], onDelete: Cascade)
+
+  retryCount      Int      @default(0) @map("retry_count")
+  nextRetry       DateTime @map("next_retry")
+  lastError       String?  @map("last_error")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([nextRetry])
+  @@index([retryCount])
+  @@map("webhook_queue")
+}
