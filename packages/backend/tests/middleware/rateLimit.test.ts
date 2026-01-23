@@ -10,9 +10,21 @@ describe('Rate Limiting Middleware', () => {
     vi.useRealTimers();
   });
 
+  // Helper to create a properly mocked request
+  const createMockReq = (overrides = {}) => ({
+    ip: '127.0.0.1',
+    headers: {},
+    body: {},
+    user: undefined,
+    app: {
+      get: vi.fn().mockReturnValue(false), // trustProxy setting
+    },
+    ...overrides,
+  });
+
   describe('loginLimiter', () => {
     it('should allow requests within limit', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -28,7 +40,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should block requests exceeding 5 per 5 minutes', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -52,7 +64,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should reset after 5 minute window', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -85,8 +97,8 @@ describe('Rate Limiting Middleware', () => {
       } as any;
       const next = vi.fn();
 
-      const req1 = { ip: '192.168.1.1' } as any;
-      const req2 = { ip: '192.168.1.2' } as any;
+      const req1 = createMockReq({ ip: '192.168.1.1' });
+      const req2 = createMockReq({ ip: '192.168.1.2' });
 
       // Fill limit for IP1
       for (let i = 0; i < 5; i++) {
@@ -106,7 +118,7 @@ describe('Rate Limiting Middleware', () => {
 
   describe('signupLimiter', () => {
     it('should allow up to 3 requests per hour', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -122,7 +134,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should block 4th request within hour', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -141,7 +153,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should reset after 1 hour', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -169,7 +181,7 @@ describe('Rate Limiting Middleware', () => {
 
   describe('downloadLimiter', () => {
     it('should allow up to 10 requests per hour', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -184,7 +196,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should block 11th request within hour', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -203,7 +215,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should reset after 1 hour', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -231,7 +243,7 @@ describe('Rate Limiting Middleware', () => {
 
   describe('globalLimiter', () => {
     it('should allow up to 100 requests per 15 minutes', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -246,7 +258,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should block 101st request within 15 minutes', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -265,7 +277,7 @@ describe('Rate Limiting Middleware', () => {
     });
 
     it('should reset after 15 minutes', () => {
-      const req = { ip: '127.0.0.1' } as any;
+      const req = createMockReq();
       const res = {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
@@ -297,8 +309,8 @@ describe('Rate Limiting Middleware', () => {
       } as any;
       const next = vi.fn();
 
-      const req1 = { ip: '192.168.1.1' } as any;
-      const req2 = { ip: '192.168.1.2' } as any;
+      const req1 = createMockReq({ ip: '192.168.1.1' });
+      const req2 = createMockReq({ ip: '192.168.1.2' });
 
       // Fill limit for IP1
       for (let i = 0; i < 100; i++) {
