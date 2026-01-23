@@ -39,7 +39,7 @@ export async function apiRequest(method: string, endpoint: string, body?: any, t
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`http://localhost:3001/api${endpoint}`, {
+  const response = await fetch(`http://localhost:3001${endpoint}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
