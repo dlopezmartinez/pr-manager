@@ -5,6 +5,35 @@
 
 import { vi } from 'vitest';
 
+// Mock DOMPurify with functional sanitization for testing
+vi.mock('dompurify', () => {
+  const mockSanitize = (dirty: string, config?: Record<string, unknown>) => {
+    // Basic sanitization for testing purposes
+    let result = dirty;
+
+    // Remove script tags
+    result = result.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+
+    // Remove event handlers
+    result = result.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+    result = result.replace(/\s*on\w+\s*=\s*[^\s>]*/gi, '');
+
+    // Remove javascript: protocol
+    result = result.replace(/javascript:/gi, '');
+
+    // Remove data: protocol
+    result = result.replace(/data:text\/html/gi, '');
+
+    return result;
+  };
+
+  return {
+    default: {
+      sanitize: mockSanitize,
+    },
+  };
+});
+
 // Mock localStorage
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
