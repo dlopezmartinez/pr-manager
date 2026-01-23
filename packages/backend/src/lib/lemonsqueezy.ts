@@ -224,7 +224,17 @@ export function verifyWebhookSignature(
   const crypto = require('crypto');
   const hmac = crypto.createHmac('sha256', secret);
   const digest = hmac.update(payload).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+
+  // timingSafeEqual throws if buffer lengths differ
+  // Handle this case gracefully
+  const signatureBuffer = Buffer.from(signature);
+  const digestBuffer = Buffer.from(digest);
+
+  if (signatureBuffer.length !== digestBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(signatureBuffer, digestBuffer);
 }
 
 export type { LemonSqueezySubscription };

@@ -17,7 +17,7 @@ export const loginLimiter = rateLimit({
   standardHeaders: false,
   legacyHeaders: false,
   skip: (req: Request) => {
-    return process.env.NODE_ENV === 'development';
+    return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
   },
   keyGenerator: (req: Request) => {
     // Rate limit por email (para detectar ataques a cuentas específicas)
@@ -43,7 +43,7 @@ export const signupLimiter = rateLimit({
   max: 3,
   standardHeaders: false,
   legacyHeaders: false,
-  skip: (req: Request) => process.env.NODE_ENV === 'development',
+  skip: (req: Request) => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       error: 'Too many signup attempts',
@@ -62,7 +62,7 @@ export const passwordChangeLimiter = rateLimit({
   max: 3,
   standardHeaders: false,
   legacyHeaders: false,
-  skip: (req: Request) => process.env.NODE_ENV === 'development',
+  skip: (req: Request) => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
   keyGenerator: (req: Request) => {
     // Rate limit por usuario autenticado
     return `password-change:${req.user?.userId || 'anonymous'}`;
@@ -86,7 +86,7 @@ export const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: false,
   legacyHeaders: false,
-  skip: (req: Request) => process.env.NODE_ENV === 'development',
+  skip: (req: Request) => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       error: 'Too many requests from this IP',
@@ -106,7 +106,7 @@ export const downloadLimiter = rateLimit({
   max: 10,
   standardHeaders: false,
   legacyHeaders: false,
-  skip: (req: Request) => process.env.NODE_ENV === 'development',
+  skip: (req: Request) => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
   keyGenerator: (req: Request) => {
     // Rate limit por user ID si autenticado, por defecto usa IP
     if (req.user?.userId) {
@@ -134,7 +134,7 @@ export const checkoutLimiter = rateLimit({
   max: 5,
   standardHeaders: false,
   legacyHeaders: false,
-  skip: (req: Request) => process.env.NODE_ENV === 'development',
+  skip: (req: Request) => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       error: 'Too many checkout attempts',
@@ -154,7 +154,7 @@ export const adminRateLimiter = rateLimit({
   max: 300,
   standardHeaders: false,
   legacyHeaders: false,
-  skip: (req: Request) => process.env.NODE_ENV === 'development',
+  skip: (req: Request) => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
   keyGenerator: (req: Request) => {
     // Rate limit por user ID para tracking
     return `admin:${req.user?.userId || 'anonymous'}`;

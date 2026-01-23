@@ -30,7 +30,18 @@ export async function logWebhookEvent(
     return event.id;
   } catch (error) {
     // Check if this is a unique constraint violation (duplicate event ID)
-    if (error instanceof Error && error.message.includes('unique constraint')) {
+    // Prisma uses code P2002 for unique constraint violations
+    const isPrismaUniqueError =
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code: string }).code === 'P2002';
+
+    const isGenericUniqueError =
+      error instanceof Error &&
+      (error.message.includes('unique constraint') || error.message.includes('Unique constraint'));
+
+    if (isPrismaUniqueError || isGenericUniqueError) {
       console.warn(`[WebhookAudit] Duplicate event ID: ${eventId}, using existing record`);
       const existing = await prisma.webhookEvent.findUnique({
         where: { eventId },

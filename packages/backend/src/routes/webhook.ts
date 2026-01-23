@@ -294,15 +294,23 @@ async function handlePaymentSuccess(event: LemonSqueezyWebhookEvent): Promise<vo
 }
 
 /**
- * Handle failed payment
+ * Handle failed payment (transactional)
  */
 async function handlePaymentFailed(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
+  const attrs = data.attributes;
 
-  console.log(`Payment failed for subscription ${data.id}`);
+  await prisma.$transaction(async (tx) => {
+    // Update subscription status to past_due
+    await tx.subscription.updateMany({
+      where: { lemonSqueezySubscriptionId: data.id },
+      data: {
+        status: attrs.status, // Usually 'past_due' when payment fails
+      },
+    });
+  });
 
-  // Status will be updated via subscription_updated webhook
-  // Here you could send an email notification to the user
+  console.log(`[Webhook] Payment failed for subscription ${data.id}, status: ${attrs.status}`);
 
   // TODO: Implement email notification
   // const subscription = await prisma.subscription.findUnique({

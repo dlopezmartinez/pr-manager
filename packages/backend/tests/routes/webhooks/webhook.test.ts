@@ -249,10 +249,10 @@ describe('Webhook Routes', () => {
 
       // Verify webhook event was logged
       const webhookEvent = await prisma.webhookEvent.findFirst({
-        where: { externalId: 'sub_audit_123' },
+        where: { eventId: 'sub_audit_123' },
       });
       expect(webhookEvent).not.toBeNull();
-      expect(webhookEvent?.eventType).toBe('subscription_created');
+      expect(webhookEvent?.eventName).toBe('subscription_created');
       expect(webhookEvent?.processed).toBe(true);
     });
 

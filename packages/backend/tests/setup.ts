@@ -1,10 +1,12 @@
 import { beforeAll, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import { prisma } from '../src/lib/prisma.js';
 
-// Mock environment variables for tests
+// Mock environment variables for tests - MUST be set before any imports
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-12345';
 process.env.DOWNLOAD_SECRET = 'test-download-secret';
+process.env.LEMONSQUEEZY_WEBHOOK_SECRET = 'test-webhook-secret-for-testing';
+process.env.LEMONSQUEEZY_API_KEY = 'test_api_key';
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://user:pass@localhost:5432/pr_manager_test';
 
 beforeAll(async () => {

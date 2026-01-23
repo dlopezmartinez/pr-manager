@@ -72,20 +72,30 @@ export function verifyLemonSqueezyWebhook(req: Request, res: Response, next: Nex
     return;
   }
 
-  if (!LEMONSQUEEZY_CONFIG.WEBHOOK_SECRET) {
+  // Read directly from env to support test environment changes
+  const webhookSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET || LEMONSQUEEZY_CONFIG.WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
     console.error('LEMONSQUEEZY_WEBHOOK_SECRET not configured');
     res.status(500).json({ error: 'Server configuration error' });
     return;
   }
 
   try {
-    // req.body should be the raw string for webhook verification
-    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    // req.body can be Buffer (from express.raw), string, or object
+    let rawBody: string;
+    if (Buffer.isBuffer(req.body)) {
+      rawBody = req.body.toString('utf8');
+    } else if (typeof req.body === 'string') {
+      rawBody = req.body;
+    } else {
+      rawBody = JSON.stringify(req.body);
+    }
 
     const isValid = verifyWebhookSignature(
       rawBody,
       signature,
-      LEMONSQUEEZY_CONFIG.WEBHOOK_SECRET
+      webhookSecret
     );
 
     if (!isValid) {
@@ -94,10 +104,15 @@ export function verifyLemonSqueezyWebhook(req: Request, res: Response, next: Nex
       return;
     }
 
-    // Parse the body if it's a string
-    const event: LemonSqueezyWebhookEvent = typeof req.body === 'string'
-      ? JSON.parse(req.body)
-      : req.body;
+    // Parse the body
+    let event: LemonSqueezyWebhookEvent;
+    if (Buffer.isBuffer(req.body)) {
+      event = JSON.parse(req.body.toString('utf8'));
+    } else if (typeof req.body === 'string') {
+      event = JSON.parse(req.body);
+    } else {
+      event = req.body;
+    }
 
     req.lemonSqueezyEvent = event;
     next();

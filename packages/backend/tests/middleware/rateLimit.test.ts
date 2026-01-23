@@ -2,11 +2,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loginLimiter, signupLimiter, downloadLimiter, globalLimiter } from '../../src/middleware/rateLimit.js';
 
 describe('Rate Limiting Middleware', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
   beforeEach(() => {
+    // Rate limiting is skipped in test/development, so set to production for these tests
+    process.env.NODE_ENV = 'production';
     vi.useFakeTimers();
   });
 
   afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
     vi.useRealTimers();
   });
 
