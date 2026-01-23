@@ -132,7 +132,7 @@ packages/app/.env.development
 packages/app/.env.production
 
 # Playwright
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/playwright/.cache/
