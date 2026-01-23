@@ -59,7 +59,6 @@ jobs:
           cache: 'npm'
 
       - name: "📦 Install dependencies"
-        working-directory: packages/backend
         run: npm ci
 
       - name: "🔍 Run ESLint"
