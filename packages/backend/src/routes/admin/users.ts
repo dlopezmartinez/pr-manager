@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma.js';
 import { requireSuperuser } from '../../middleware/roles.js';
 import { logAudit } from '../../services/auditService.js';
 import logger from '../../lib/logger.js';
+import { getQueryString, getQueryBoolean, getQueryNumber, toStr } from '../../utils/queryParams.js';
 
 const router = Router();
 
@@ -13,32 +14,36 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(Math.max(1, Number(req.query.limit) || 50), 100);
+    const page = Math.max(1, getQueryNumber(req.query.page) || 1);
+    const limit = Math.min(Math.max(1, getQueryNumber(req.query.limit) || 50), 100);
     const skip = (page - 1) * limit;
 
     const where: any = {};
 
     // Filter by role
-    if (req.query.role) {
-      where.role = String(req.query.role);
+    const role = getQueryString(req.query.role);
+    if (role) {
+      where.role = role;
     }
 
     // Filter by active status
-    if (req.query.isActive !== undefined) {
-      where.isActive = req.query.isActive === 'true';
+    const isActive = getQueryBoolean(req.query.isActive);
+    if (isActive !== undefined) {
+      where.isActive = isActive;
     }
 
     // Filter by suspended status
-    if (req.query.isSuspended !== undefined) {
-      where.isSuspended = req.query.isSuspended === 'true';
+    const isSuspended = getQueryBoolean(req.query.isSuspended);
+    if (isSuspended !== undefined) {
+      where.isSuspended = isSuspended;
     }
 
     // Search by email or name
-    if (req.query.search) {
+    const search = getQueryString(req.query.search);
+    if (search) {
       where.OR = [
-        { email: { contains: String(req.query.search), mode: 'insensitive' } },
-        { name: { contains: String(req.query.search), mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -87,7 +92,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: toStr(req.params.id) || '' },
       select: {
         id: true,
         email: true,
@@ -146,7 +151,7 @@ router.patch('/:id/role', requireSuperuser, async (req: Request, res: Response) 
     }
 
     const oldUser = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: toStr(req.params.id) || '' },
       select: { role: true },
     });
 
@@ -157,7 +162,7 @@ router.patch('/:id/role', requireSuperuser, async (req: Request, res: Response) 
 
     const updatedUser = await prisma.$transaction(async (tx) => {
       const user = await tx.user.update({
-        where: { id: req.params.id },
+        where: { id: toStr(req.params.id) || '' },
         data: { role: validation.data.role },
         select: {
           id: true,
@@ -217,7 +222,7 @@ router.post('/:id/suspend', requireSuperuser, async (req: Request, res: Response
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: toStr(req.params.id) || '' },
       select: { isSuspended: true },
     });
 
@@ -233,7 +238,7 @@ router.post('/:id/suspend', requireSuperuser, async (req: Request, res: Response
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
-        where: { id: req.params.id },
+        where: { id: toStr(req.params.id) || '' },
         data: {
           isSuspended: true,
           suspendedReason: validation.data.reason,
@@ -243,13 +248,13 @@ router.post('/:id/suspend', requireSuperuser, async (req: Request, res: Response
 
       // Invalidate all sessions for this user
       await tx.session.deleteMany({
-        where: { userId: req.params.id },
+        where: { userId: toStr(req.params.id) || '' },
       });
 
       await logAudit({
         action: 'USER_SUSPENDED',
         performedBy: req.user!.userId,
-        targetUserId: req.params.id,
+        targetUserId: toStr(req.params.id),
         changes: { reason: validation.data.reason },
         metadata: { ip: req.ip, userAgent: req.get('user-agent') },
       });
@@ -281,7 +286,7 @@ router.post('/:id/unsuspend', requireSuperuser, async (req: Request, res: Respon
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: toStr(req.params.id) || '' },
       select: { isSuspended: true },
     });
 
@@ -297,7 +302,7 @@ router.post('/:id/unsuspend', requireSuperuser, async (req: Request, res: Respon
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
-        where: { id: req.params.id },
+        where: { id: toStr(req.params.id) || '' },
         data: {
           isSuspended: false,
           suspendedReason: null,
@@ -308,7 +313,7 @@ router.post('/:id/unsuspend', requireSuperuser, async (req: Request, res: Respon
       await logAudit({
         action: 'USER_UNSUSPENDED',
         performedBy: req.user!.userId,
-        targetUserId: req.params.id,
+        targetUserId: toStr(req.params.id),
         metadata: { ip: req.ip, userAgent: req.get('user-agent') },
       });
     });
@@ -338,7 +343,7 @@ router.delete('/:id', requireSuperuser, async (req: Request, res: Response) => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+      where: { id: toStr(req.params.id) || '' },
       select: { isActive: true, email: true },
     });
 
@@ -355,20 +360,20 @@ router.delete('/:id', requireSuperuser, async (req: Request, res: Response) => {
     await prisma.$transaction(async (tx) => {
       // Soft delete: mark as inactive and revoke sessions
       await tx.user.update({
-        where: { id: req.params.id },
+        where: { id: toStr(req.params.id) || '' },
         data: {
           isActive: false,
         },
       });
 
       await tx.session.deleteMany({
-        where: { userId: req.params.id },
+        where: { userId: toStr(req.params.id) || '' },
       });
 
       await logAudit({
         action: 'USER_DELETED',
         performedBy: req.user!.userId,
-        targetUserId: req.params.id,
+        targetUserId: toStr(req.params.id),
         changes: { email: user.email },
         metadata: { ip: req.ip, userAgent: req.get('user-agent') },
       });

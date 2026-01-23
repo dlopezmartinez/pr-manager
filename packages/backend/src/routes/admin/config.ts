@@ -5,6 +5,7 @@ import { requireSuperuser } from '../../middleware/roles.js';
 import { logAudit } from '../../services/auditService.js';
 import logger from '../../lib/logger.js';
 import { Prisma } from '@prisma/client';
+import { getQueryString, toStr } from '../../utils/queryParams.js';
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:key', async (req: Request, res: Response) => {
   try {
     const config = await prisma.systemConfig.findUnique({
-      where: { key: req.params.key },
+      where: { key: toStr(req.params.key) || '' },
       select: {
         id: true,
         key: true,
@@ -139,7 +140,7 @@ router.post('/', requireSuperuser, async (req: Request, res: Response) => {
 router.delete('/:key', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const config = await prisma.systemConfig.findUnique({
-      where: { key: req.params.key },
+      where: { key: toStr(req.params.key) || '' },
       select: { value: true },
     });
 
@@ -150,7 +151,7 @@ router.delete('/:key', requireSuperuser, async (req: Request, res: Response) => 
 
     await prisma.$transaction(async (tx) => {
       await tx.systemConfig.delete({
-        where: { key: req.params.key },
+        where: { key: toStr(req.params.key) || '' },
       });
 
       await logAudit({

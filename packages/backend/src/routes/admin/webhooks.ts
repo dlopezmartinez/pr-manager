@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { requireSuperuser } from '../../middleware/roles.js';
 import { logAudit } from '../../services/auditService.js';
 import logger from '../../lib/logger.js';
+import { getQueryNumber, getQueryBoolean, getQueryString, toStr } from '../../utils/queryParams.js';
 
 const router = Router();
 
@@ -12,8 +13,8 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(Math.max(1, Number(req.query.limit) || 50), 100);
+    const page = Math.max(1, getQueryNumber(req.query.page) || 1);
+    const limit = Math.min(Math.max(1, getQueryNumber(req.query.limit) || 50), 100);
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -70,7 +71,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const webhook = await prisma.webhookEvent.findUnique({
-      where: { id: req.params.id },
+      where: { id: toStr(req.params.id) || '' },
       select: {
         id: true,
         eventId: true,
@@ -111,7 +112,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 router.post('/:id/retry', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const webhook = await prisma.webhookEvent.findUnique({
-      where: { id: req.params.id },
+      where: { id: toStr(req.params.id) || '' },
       select: { eventId: true, eventName: true, processed: true },
     });
 
@@ -124,7 +125,7 @@ router.post('/:id/retry', requireSuperuser, async (req: Request, res: Response) 
     const updated = await prisma.$transaction(async (tx) => {
       // Clear error state
       const event = await tx.webhookEvent.update({
-        where: { id: req.params.id },
+        where: { id: toStr(req.params.id) || '' },
         data: {
           error: null,
           errorCount: 0,
@@ -141,9 +142,9 @@ router.post('/:id/retry', requireSuperuser, async (req: Request, res: Response) 
 
       // Create or update queue entry
       await tx.webhookQueue.upsert({
-        where: { webhookEventId: req.params.id },
+        where: { webhookEventId: toStr(req.params.id) || '' },
         create: {
-          webhookEventId: req.params.id,
+          webhookEventId: toStr(req.params.id) || '',
           retryCount: 0,
           nextRetry: new Date(),
         },

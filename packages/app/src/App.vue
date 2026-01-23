@@ -58,6 +58,14 @@
             <span class="pulse-dot"></span>
             <span class="countdown">{{ nextPollIn }}s</span>
           </div>
+          <button
+            v-if="isSuperuser"
+            class="titlebar-btn"
+            @click="showAdminDashboard = true"
+            title="Admin Dashboard"
+          >
+            <Shield :size="16" :stroke-width="2" />
+          </button>
           <button class="titlebar-btn" @click="showSettings = true" title="Settings">
             <Settings :size="16" :stroke-width="2" />
           </button>
@@ -117,6 +125,9 @@
       </template>
     </SettingsScreen>
 
+    <!-- Admin Dashboard Modal -->
+    <AdminDashboard v-if="showAdminDashboard" @close="showAdminDashboard = false" />
+
     <!-- View Editor Dialog -->
     <ViewEditorDialog
       v-if="showViewEditor"
@@ -132,7 +143,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue';
-import { RefreshCw, Settings, AlertTriangle } from 'lucide-vue-next';
+import { RefreshCw, Settings, AlertTriangle, Shield } from 'lucide-vue-next';
 import { useGitProvider } from './composables/useGitProvider';
 import { useViewPolling } from './composables/useViewPolling';
 import { useAuthHealthPolling } from './composables/useAuthHealthPolling';
@@ -158,6 +169,7 @@ import NotificationInbox from './components/NotificationInbox.vue';
 import AuthView from './components/AuthView.vue';
 import SubscriptionScreen from './components/SubscriptionScreen.vue';
 import TrialBanner from './components/TrialBanner.vue';
+import AdminDashboard from './components/AdminDashboard.vue';
 import { validateToken } from './utils/electron';
 import { getApiKey } from './stores/configStore';
 import { isNotificationsView } from './config/default-views';
@@ -181,6 +193,7 @@ const viewAdapter = new ViewAdapter(provider.pullRequests);
 const isConfigured = computed(() => checkConfigured());
 const showSettings = ref(false);
 const showViewEditor = ref(false);
+const showAdminDashboard = ref(false);
 
 // Token validation state
 const isValidatingToken = ref(false);
@@ -196,6 +209,9 @@ const currentViewState = computed(() => useViewState(activeView.value.id));
 
 // Check if current view is the notifications view
 const isNotificationsViewActive = computed(() => isNotificationsView(activeView.value.id));
+
+// Check if user is SUPERUSER for admin dashboard access
+const isSuperuser = computed(() => authStore.state.user?.role === 'SUPERUSER');
 
 // Calculate PR counts for all views (for tab badges)
 const prCounts = computed(() => {

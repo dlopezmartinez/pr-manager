@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { getAuditLogs } from '../../services/auditService.js';
 import logger from '../../lib/logger.js';
+import { getQueryNumber, getQueryString } from '../../utils/queryParams.js';
 
 const router = Router();
 
@@ -11,8 +12,8 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(Math.max(1, Number(req.query.limit) || 50), 100);
+    const page = Math.max(1, getQueryNumber(req.query.page) || 1);
+    const limit = Math.min(Math.max(1, getQueryNumber(req.query.limit) || 50), 100);
 
     const filters: any = {
       page,

@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma.js';
 import { requireSuperuser } from '../../middleware/roles.js';
 import { logAudit } from '../../services/auditService.js';
 import logger from '../../lib/logger.js';
+import { getQueryNumber, getQueryString, toStr } from '../../utils/queryParams.js';
 
 const router = Router();
 
@@ -12,8 +13,8 @@ const router = Router();
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const page = Math.max(1, Number(req.query.page) || 1);
-    const limit = Math.min(Math.max(1, Number(req.query.limit) || 50), 100);
+    const page = Math.max(1, getQueryNumber(req.query.page) || 1);
+    const limit = Math.min(Math.max(1, getQueryNumber(req.query.limit) || 50), 100);
     const skip = (page - 1) * limit;
 
     const [sessions, total] = await Promise.all([
@@ -61,7 +62,7 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
 
     const [sessions, total] = await Promise.all([
       prisma.session.findMany({
-        where: { userId: req.params.userId },
+        where: { userId: toStr(req.params.userId) || '' },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -72,7 +73,7 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
           expiresAt: true,
         },
       }),
-      prisma.session.count({ where: { userId: req.params.userId } }),
+      prisma.session.count({ where: { userId: toStr(req.params.userId) || '' } }),
     ]);
 
     res.json({
@@ -97,7 +98,7 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
 router.delete('/:id', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const session = await prisma.session.findUnique({
-      where: { id: req.params.id },
+      where: { id: toStr(req.params.id) || '' },
       select: { userId: true },
     });
 
@@ -108,7 +109,7 @@ router.delete('/:id', requireSuperuser, async (req: Request, res: Response) => {
 
     await prisma.$transaction(async (tx) => {
       await tx.session.delete({
-        where: { id: req.params.id },
+        where: { id: toStr(req.params.id) || '' },
       });
 
       await logAudit({
@@ -145,7 +146,7 @@ router.delete('/user/:userId/all', requireSuperuser, async (req: Request, res: R
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: req.params.userId },
+      where: { id: toStr(req.params.userId) || '' },
       select: { id: true },
     });
 
@@ -156,13 +157,13 @@ router.delete('/user/:userId/all', requireSuperuser, async (req: Request, res: R
 
     const result = await prisma.$transaction(async (tx) => {
       const deleted = await tx.session.deleteMany({
-        where: { userId: req.params.userId },
+        where: { userId: toStr(req.params.userId) || '' },
       });
 
       await logAudit({
         action: 'SESSION_REVOKED_ALL',
         performedBy: req.user!.userId,
-        targetUserId: req.params.userId,
+        targetUserId: toStr(req.params.userId),
         changes: { sessionsRevoked: deleted.count },
         metadata: { ip: req.ip },
       });

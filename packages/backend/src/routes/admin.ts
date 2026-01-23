@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/roles.js';
 import { adminRateLimiter } from '../middleware/rateLimit.js';
-import { requireAdminSecret, requireAdminSecretOrAuth } from '../middleware/adminSecret.js';
+import { requireAdminSecret } from '../middleware/adminSecret.js';
 
 // Sub-routers
 import usersRouter from './admin/users.js';
