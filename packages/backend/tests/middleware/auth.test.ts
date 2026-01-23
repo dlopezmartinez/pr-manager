@@ -311,7 +311,10 @@ describe('Auth Middleware', () => {
 
       authenticate(req, res, next);
 
-      expect(req.user).toEqual(payload);
+      // JWT includes iat and exp, so check essential payload fields
+      expect(req.user.userId).toBe(payload.userId);
+      expect(req.user.email).toBe(payload.email);
+      expect(req.user.role).toBe(payload.role);
     });
 
     it('should require Bearer prefix', () => {

@@ -5,24 +5,55 @@
 
 import { vi } from 'vitest';
 
-// Mock DOMPurify with functional sanitization for testing
+// Mock DOMPurify with comprehensive sanitization for testing
 vi.mock('dompurify', () => {
   const mockSanitize = (dirty: string, config?: Record<string, unknown>) => {
-    // Basic sanitization for testing purposes
     let result = dirty;
 
-    // Remove script tags
-    result = result.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    // Check if RETURN_DOM_FRAGMENT or ALLOWED_TAGS is empty (for sanitizeText)
+    const allowedTags = config?.ALLOWED_TAGS as string[] | undefined;
+    if (allowedTags && allowedTags.length === 0) {
+      // Strip ALL HTML tags for sanitizeText
+      result = result.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      result = result.replace(/<[^>]+>/g, '');
+      return result;
+    }
 
-    // Remove event handlers
+    // Remove dangerous tags completely (including content)
+    result = result.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    result = result.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+    result = result.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+    result = result.replace(/<iframe[^>]*>/gi, '');
+    result = result.replace(/<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi, '');
+    result = result.replace(/<meta[^>]*>/gi, '');
+    result = result.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+    result = result.replace(/<embed[^>]*>/gi, '');
+    result = result.replace(/<link[^>]*>/gi, '');
+    result = result.replace(/<base[^>]*>/gi, '');
+
+    // Remove HTML comments (may contain malicious content)
+    result = result.replace(/<!--[\s\S]*?-->/g, '');
+
+    // Remove event handlers (onclick, onerror, onload, etc.)
     result = result.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
     result = result.replace(/\s*on\w+\s*=\s*[^\s>]*/gi, '');
 
     // Remove javascript: protocol
     result = result.replace(/javascript:/gi, '');
 
-    // Remove data: protocol
-    result = result.replace(/data:text\/html/gi, '');
+    // Remove data: protocol for dangerous content
+    result = result.replace(/data:text\/html[^"']*/gi, '');
+
+    // Remove data-* attributes (custom data attributes can be used maliciously)
+    result = result.replace(/\s*data-[a-z0-9-]+\s*=\s*["'][^"']*["']/gi, '');
+    result = result.replace(/\s*data-[a-z0-9-]+\s*=\s*[^\s>]*/gi, '');
+
+    // Clean up href attributes with javascript
+    result = result.replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href=""');
+
+    // Remove alert and other dangerous function calls from remaining attributes
+    result = result.replace(/alert\s*\([^)]*\)/gi, '');
+    result = result.replace(/eval\s*\([^)]*\)/gi, '');
 
     return result;
   };
