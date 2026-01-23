@@ -14,6 +14,8 @@ import {
   signupLimiter,
   globalLimiter,
 } from './middleware/rateLimit.js';
+import { requestLogger, errorLogger } from './middleware/requestLogger.js';
+import logger from './lib/logger.js';
 
 export function createApp() {
   const app = express();
@@ -29,6 +31,9 @@ export function createApp() {
   };
 
   app.use(cors(corsOptions));
+
+  // Request logging (early to capture all requests)
+  app.use(requestLogger);
 
   // Security headers
   app.use(helmet({
@@ -74,11 +79,17 @@ export function createApp() {
     res.status(404).json({ error: 'Not found' });
   });
 
+  // Error logging middleware (logs errors with request context)
+  app.use(errorLogger);
+
   // Global error handler
   app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-    console.error('Unhandled error:', err);
-    res.status(500).json({
+    // Error already logged by errorLogger middleware
+    const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
+
+    res.status(statusCode).json({
       error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
+      ...(req.requestId && { requestId: req.requestId }),
     });
   });
 
