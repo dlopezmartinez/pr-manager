@@ -20,7 +20,8 @@ vi.mock('../../src/services/authService', () => ({
 }));
 
 vi.mock('../../src/services/http', () => ({
-  onAuthError: vi.fn().mockReturnValue(() => {}),
+  // Returns an unsubscribe function (noop for tests)
+  onAuthError: vi.fn().mockReturnValue(vi.fn()),
 }));
 
 // Import after mocks are set up
