@@ -113,6 +113,16 @@ const electronAPIMock = {
     setZoomFactor: vi.fn(),
     getZoomFactor: vi.fn().mockReturnValue(1),
   },
+  auth: {
+    getToken: vi.fn().mockResolvedValue(null),
+    setToken: vi.fn().mockResolvedValue(undefined),
+    clearToken: vi.fn().mockResolvedValue(undefined),
+    getRefreshToken: vi.fn().mockResolvedValue(null),
+    setRefreshToken: vi.fn().mockResolvedValue(undefined),
+    clearRefreshToken: vi.fn().mockResolvedValue(undefined),
+    getUser: vi.fn().mockResolvedValue(null),
+    setUser: vi.fn().mockResolvedValue(undefined),
+  },
 };
 
 Object.defineProperty(globalThis, 'window', {
