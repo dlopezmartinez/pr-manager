@@ -52,34 +52,6 @@ CREATE TABLE "sessions" (
 );
 
 -- CreateTable
-CREATE TABLE "webhook_events" (
-    "id" TEXT NOT NULL,
-    "event_id" TEXT NOT NULL,
-    "event_name" TEXT NOT NULL,
-    "payload" JSONB NOT NULL,
-    "processed_at" TIMESTAMP(3),
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "webhook_events_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "webhook_queue" (
-    "id" TEXT NOT NULL,
-    "event_id" TEXT NOT NULL,
-    "user_id" TEXT NOT NULL,
-    "event_name" TEXT NOT NULL,
-    "payload" JSONB NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'pending',
-    "retries" INTEGER NOT NULL DEFAULT 0,
-    "last_error" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "webhook_queue_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "admin_secrets" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
@@ -133,18 +105,6 @@ CREATE INDEX "sessions_user_id_idx" ON "sessions"("user_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "sessions_token_key" ON "sessions"("token");
-
--- CreateIndex
-CREATE UNIQUE INDEX "webhook_events_event_id_key" ON "webhook_events"("event_id");
-
--- CreateIndex
-CREATE INDEX "webhook_events_created_at_idx" ON "webhook_events"("created_at");
-
--- CreateIndex
-CREATE INDEX "webhook_events_event_name_idx" ON "webhook_events"("event_name");
-
--- CreateIndex
-CREATE INDEX "webhook_events_processed_idx" ON "webhook_events"("processed_at");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "admin_secrets_secret_hash_key" ON "admin_secrets"("secret_hash");
