@@ -7,6 +7,7 @@ import subscriptionRoutes from './routes/subscription.js';
 import webhookRoutes from './routes/webhook.js';
 import checkoutRoutes from './routes/checkout.js';
 import downloadRoutes from './routes/download.js';
+import adminRoutes from './routes/admin.js';
 import { scheduleDaily, startScheduler, getSchedulerStatus } from './services/scheduler.js';
 import { runSubscriptionSync } from './jobs/syncSubscriptions.js';
 import { processWebhookQueue } from './jobs/processWebhookQueue.js';
@@ -62,6 +63,7 @@ app.use('/auth', authRoutes);
 app.use('/subscription', subscriptionRoutes);
 app.use('/checkout', checkoutRoutes);
 app.use('/download', downloadRoutes);
+app.use('/admin', adminRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

@@ -143,3 +143,27 @@ export const checkoutLimiter = rateLimit({
     });
   },
 });
+
+/**
+ * Rate limit para Admin: máximo 300 requests cada 15 minutos
+ * Más alto que global para permitir operaciones bulk en admin
+ * Rate limit por user ID para tracking de acciones admin
+ */
+export const adminRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 300,
+  standardHeaders: false,
+  legacyHeaders: false,
+  skip: (req: Request) => process.env.NODE_ENV === 'development',
+  keyGenerator: (req: Request) => {
+    // Rate limit por user ID para tracking
+    return `admin:${req.user?.userId || 'anonymous'}`;
+  },
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too many admin requests',
+      message: 'Please try again later',
+      retryAfter: 900,
+    });
+  },
+});

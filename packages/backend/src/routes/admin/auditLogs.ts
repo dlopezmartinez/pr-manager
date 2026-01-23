@@ -1,0 +1,74 @@
+import { Router, Request, Response } from 'express';
+import { z } from 'zod';
+import { getAuditLogs } from '../../services/auditService.js';
+import logger from '../../lib/logger.js';
+
+const router = Router();
+
+/**
+ * GET /admin/audit-logs
+ * List audit logs with optional filtering
+ */
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(Math.max(1, Number(req.query.limit) || 50), 100);
+
+    const filters: any = {
+      page,
+      limit,
+    };
+
+    // Add optional filters
+    if (req.query.action) {
+      filters.action = String(req.query.action);
+    }
+
+    if (req.query.performedBy) {
+      filters.performedBy = String(req.query.performedBy);
+    }
+
+    if (req.query.targetUserId) {
+      filters.targetUserId = String(req.query.targetUserId);
+    }
+
+    // Parse date filters
+    if (req.query.startDate) {
+      try {
+        filters.startDate = new Date(String(req.query.startDate));
+        if (isNaN(filters.startDate.getTime())) {
+          res.status(400).json({ error: 'Invalid startDate format' });
+          return;
+        }
+      } catch {
+        res.status(400).json({ error: 'Invalid startDate format' });
+        return;
+      }
+    }
+
+    if (req.query.endDate) {
+      try {
+        filters.endDate = new Date(String(req.query.endDate));
+        if (isNaN(filters.endDate.getTime())) {
+          res.status(400).json({ error: 'Invalid endDate format' });
+          return;
+        }
+      } catch {
+        res.status(400).json({ error: 'Invalid endDate format' });
+        return;
+      }
+    }
+
+    const result = await getAuditLogs(filters);
+
+    res.json({
+      logs: result.logs,
+      pagination: result.pagination,
+    });
+  } catch (error) {
+    logger.error('Failed to list audit logs', { error });
+    res.status(500).json({ error: 'Failed to list audit logs' });
+  }
+});
+
+export default router;

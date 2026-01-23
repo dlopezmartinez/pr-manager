@@ -13,7 +13,11 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "lint": "eslint --ext .ts src/",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:user": "tsx src/cli/seed-user.ts",
+    "admin:create-secret": "tsx src/cli/create-admin-secret.ts",
+    "admin:secret:list": "tsx src/cli/create-admin-secret.ts list",
+    "admin:secret:revoke": "tsx src/cli/create-admin-secret.ts revoke"
   },
   "keywords": [
     "api",
