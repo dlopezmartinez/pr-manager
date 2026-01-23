@@ -56,7 +56,7 @@ export function sanitizeHtml(dirty: string): string {
     ],
     // Block dangerous protocols
     ALLOWED_URI_REGEXP:
-      /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|blob):|[^a-z]|[a-z+.\-]*(?:[^a-z+.\-:]|$))/i,
+      /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|blob):|[^a-z]|[a-z+.-]*(?:[^a-z+.-:]|$))/i,
   });
 }
 

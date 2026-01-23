@@ -1,4 +1,4 @@
-import { httpGet, httpPost, httpPatch, httpDelete } from './http.js';
+import { httpGet, httpPost, httpPatch, httpDelete } from './http';
 import type {
   AdminUser,
   AdminSession,
