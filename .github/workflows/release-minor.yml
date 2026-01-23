@@ -333,6 +333,7 @@ jobs:
           files: |
             packages/app/out/make/squirrel.windows/**/*.exe
             packages/app/out/make/squirrel.windows/**/*.nupkg
+            packages/app/out/make/squirrel.windows/**/RELEASES
             packages/app/out/make/zip/win32/**/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}

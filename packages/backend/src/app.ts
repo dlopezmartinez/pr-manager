@@ -12,6 +12,7 @@ import subscriptionRoutes from './routes/subscription.js';
 import webhookRoutes from './routes/webhook.js';
 import checkoutRoutes from './routes/checkout.js';
 import downloadRoutes from './routes/download.js';
+import updatesRoutes from './routes/updates.js';
 import adminRoutes from './routes/admin.js';
 import {
   loginLimiter,
@@ -64,6 +65,7 @@ export function createApp() {
   app.use('/subscription', subscriptionRoutes);
   app.use('/checkout', checkoutRoutes);
   app.use('/download', downloadRoutes);
+  app.use('/updates', updatesRoutes);
   app.use('/admin', adminRoutes);
 
   app.use((req: Request, res: Response) => {

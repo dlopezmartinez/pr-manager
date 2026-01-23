@@ -1,7 +1,7 @@
 import { initSentryMain } from './lib/sentry';
 initSentryMain();
 
-import { initAutoUpdater } from './lib/autoUpdater';
+import { initAutoUpdater, setUpdateToken } from './lib/autoUpdater';
 
 import { app, BrowserWindow, Tray, screen, Menu, ipcMain, shell, Notification } from 'electron';
 import path from 'node:path';
@@ -243,10 +243,12 @@ function setupIpcHandlers(): void {
   });
 
   ipcMain.handle('auth:set-token', async (_, token: string) => {
+    setUpdateToken(token);
     return setSecureValue(AUTH_TOKEN_KEY, token);
   });
 
   ipcMain.handle('auth:clear-token', async () => {
+    setUpdateToken(null);
     await deleteSecureValue(AUTH_TOKEN_KEY);
     await deleteSecureValue(AUTH_REFRESH_TOKEN_KEY);
     await deleteSecureValue(AUTH_USER_KEY);
@@ -430,7 +432,7 @@ function cleanup(): void {
   syncingFrames = [];
 }
 
-app.on('ready', () => {
+app.on('ready', async () => {
   if (process.platform === 'darwin') {
     app.dock?.hide();
   }
@@ -440,6 +442,11 @@ app.on('ready', () => {
   setupIpcHandlers();
 
   initAutoUpdater(mainWindow);
+
+  const storedToken = await getSecureValue(AUTH_TOKEN_KEY);
+  if (storedToken) {
+    setUpdateToken(storedToken);
+  }
 });
 
 app.on('before-quit', () => {
