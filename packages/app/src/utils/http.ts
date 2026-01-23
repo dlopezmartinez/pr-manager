@@ -1,23 +1,8 @@
-/**
- * HTTP Utilities with Retry Logic
- *
- * Provides robust HTTP request handling with:
- * - Automatic retry for transient failures
- * - Exponential backoff
- * - Timeout handling
- * - Better error messages
- */
-
 export interface RetryOptions {
-  /** Maximum number of retry attempts (default: 3) */
   maxRetries?: number;
-  /** Initial delay between retries in ms (default: 1000) */
   initialDelay?: number;
-  /** Maximum delay between retries in ms (default: 10000) */
   maxDelay?: number;
-  /** Request timeout in ms (default: 30000) */
   timeout?: number;
-  /** Whether to retry on specific status codes */
   retryOnStatus?: number[];
 }
 
@@ -29,9 +14,6 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
   retryOnStatus: [408, 429, 500, 502, 503, 504],
 };
 
-/**
- * Custom error class for HTTP errors with additional context
- */
 export class HttpError extends Error {
   constructor(
     message: string,
@@ -76,9 +58,6 @@ export class HttpError extends Error {
   }
 }
 
-/**
- * Custom error class for GraphQL errors
- */
 export class GraphQLError extends Error {
   constructor(
     message: string,
@@ -94,26 +73,16 @@ export class GraphQLError extends Error {
   }
 }
 
-/**
- * Sleep for a given number of milliseconds
- */
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Calculate exponential backoff delay
- */
 function calculateBackoff(attempt: number, initialDelay: number, maxDelay: number): number {
   const delay = initialDelay * Math.pow(2, attempt);
-  // Add jitter (±25%)
   const jitter = delay * 0.25 * (Math.random() * 2 - 1);
   return Math.min(delay + jitter, maxDelay);
 }
 
-/**
- * Fetch with timeout support
- */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
@@ -138,9 +107,6 @@ async function fetchWithTimeout(
   }
 }
 
-/**
- * Fetch with automatic retry on transient failures
- */
 export async function fetchWithRetry(
   url: string,
   options: RequestInit = {},
@@ -153,7 +119,6 @@ export async function fetchWithRetry(
     try {
       const response = await fetchWithTimeout(url, options, opts.timeout);
 
-      // Check if we should retry based on status code
       if (!response.ok && opts.retryOnStatus.includes(response.status)) {
         if (attempt < opts.maxRetries) {
           const delay = calculateBackoff(attempt, opts.initialDelay, opts.maxDelay);
@@ -170,7 +135,6 @@ export async function fetchWithRetry(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      // Only retry on network errors or timeouts
       const isRetryable = lastError instanceof HttpError && lastError.isRetryable;
       const isNetworkError = lastError.name === 'TypeError' && lastError.message.includes('fetch');
 
@@ -184,7 +148,6 @@ export async function fetchWithRetry(
         continue;
       }
 
-      // If it's a network error, wrap it in HttpError
       if (isNetworkError) {
         throw HttpError.network(url, lastError);
       }
@@ -193,13 +156,9 @@ export async function fetchWithRetry(
     }
   }
 
-  // Should not reach here, but just in case
   throw lastError || new Error('Unknown error');
 }
 
-/**
- * Execute a GraphQL query with retry support
- */
 export async function executeGraphQL<T>(
   endpoint: string,
   query: string,
@@ -233,9 +192,6 @@ export async function executeGraphQL<T>(
   return result;
 }
 
-/**
- * Check if an error is a rate limit error
- */
 export function isRateLimitError(error: unknown): boolean {
   if (error instanceof HttpError) {
     return error.status === 429;
@@ -249,9 +205,6 @@ export function isRateLimitError(error: unknown): boolean {
   return false;
 }
 
-/**
- * Check if an error is an authentication error
- */
 export function isAuthError(error: unknown): boolean {
   if (error instanceof HttpError) {
     return error.status === 401 || error.status === 403;
@@ -266,9 +219,6 @@ export function isAuthError(error: unknown): boolean {
   return false;
 }
 
-/**
- * Get user-friendly error message
- */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof HttpError) {
     if (error.status === 401) return 'Authentication failed. Please check your API token.';

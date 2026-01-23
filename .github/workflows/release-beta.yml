@@ -1,4 +1,4 @@
-name: "🧪 Beta Release (No Auth)"
+name: "🧪 Beta Release"
 
 on:
   workflow_dispatch:
@@ -79,28 +79,22 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ inputs.version }}
-          name: "🧪 v${{ inputs.version }} (Beta - No Auth Required)"
+          name: "🧪 v${{ inputs.version }} (Beta)"
           body: |
             ## 🧪 Beta Release v${{ inputs.version }}
 
             **⚠️ This is a BETA release for testing purposes**
 
-            ### Key Features
-            - 🔓 **No authentication required** - Skip login for quick testing
-            - 🔓 **No subscription required** - Full access without payment
-            - 🧪 For beta testers and development only
-
-            ### How to Use
+            ### For Beta Testers
             1. Download the app for your platform below
-            2. Install and launch - no signup needed
-            3. Connect your GitHub/GitLab account directly
+            2. Sign up or log in with your email
+            3. Contact us to get beta tester access (free subscription)
             4. Start testing!
 
             ### Important Notes
-            - This build has `VITE_SKIP_AUTH=true` enabled
-            - Not for production use
             - Features may be unstable
             - Report bugs via GitHub Issues
+            - Beta tester accounts have full access at no cost
 
             ---
 
@@ -114,14 +108,14 @@ jobs:
 
             ---
 
-            📦 *Beta release - Not for production*
+            📦 *Beta release - Thank you for testing!*
           draft: false
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
   build:
-    name: "🔨 Build ${{ matrix.platform }} (No Auth)"
+    name: "🔨 Build ${{ matrix.platform }}"
     needs: beta-release
     runs-on: ${{ matrix.os }}
     strategy:
@@ -153,30 +147,17 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y dpkg fakeroot rpm
 
-      - name: "🔧 Create .env.production with VITE_SKIP_AUTH"
-        shell: bash
-        run: |
-          echo "VITE_SKIP_AUTH=true" > packages/app/.env.production
-          echo "✅ VITE_SKIP_AUTH enabled for beta build"
-          cat packages/app/.env.production
-
-      - name: "🍎 Build macOS (Beta)"
+      - name: "🍎 Build macOS"
         if: matrix.os == 'macos-latest'
         run: npm run app:make:mac
-        env:
-          VITE_SKIP_AUTH: 'true'
 
-      - name: "🪟 Build Windows (Beta)"
+      - name: "🪟 Build Windows"
         if: matrix.os == 'windows-latest'
         run: npm run app:make:win
-        env:
-          VITE_SKIP_AUTH: 'true'
 
-      - name: "🐧 Build Linux (Beta)"
+      - name: "🐧 Build Linux"
         if: matrix.os == 'ubuntu-latest'
         run: npm run app:make:linux
-        env:
-          VITE_SKIP_AUTH: 'true'
 
       - name: "📤 Upload macOS assets"
         if: matrix.os == 'macos-latest'

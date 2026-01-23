@@ -18,7 +18,6 @@ import { computed } from 'vue';
 import { authStore } from '../stores/authStore';
 
 const showBanner = computed(() => {
-  // Show banner if user is in trial or subscription is about to cancel
   const sub = authStore.state.subscription;
   if (!sub) return false;
 
@@ -81,14 +80,12 @@ async function handleUpgrade() {
   const sub = authStore.state.subscription;
 
   if (sub?.cancelAtPeriodEnd) {
-    // Reactivate subscription
     try {
       await authStore.openCustomerPortal();
     } catch (err) {
       console.error('Failed to open portal:', err);
     }
   } else {
-    // Open checkout for upgrade
     try {
       await authStore.openCheckout('yearly');
     } catch (err) {

@@ -1,12 +1,6 @@
-/**
- * Email Service
- * Handles sending emails via Resend
- */
-
 import { Resend } from 'resend';
 import logger from '../lib/logger.js';
 
-// Lazy initialization to avoid errors when API key is not set
 let resend: Resend | null = null;
 
 function getResendClient(): Resend | null {
@@ -26,10 +20,6 @@ interface SendEmailOptions {
   text?: string;
 }
 
-/**
- * Send an email via Resend
- * Returns true if successful, false otherwise
- */
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   const client = getResendClient();
 

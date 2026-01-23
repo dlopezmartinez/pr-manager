@@ -10,11 +10,6 @@ import { APP_VERSION } from '../lib/version.js';
 
 const router = Router();
 
-/**
- * POST /checkout/create
- * Create a public LemonSqueezy Checkout session (no auth required)
- * Used by landing page for new customers
- */
 router.post('/create', checkoutLimiter, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
@@ -33,7 +28,6 @@ router.post('/create', checkoutLimiter, async (req: Request, res: Response) => {
 
     const { priceId, email } = validation.data;
 
-    // Get the variant ID based on price selection
     const variantId = priceId === 'monthly'
       ? LEMONSQUEEZY_CONFIG.VARIANT_MONTHLY
       : LEMONSQUEEZY_CONFIG.VARIANT_YEARLY;
@@ -43,8 +37,6 @@ router.post('/create', checkoutLimiter, async (req: Request, res: Response) => {
       return;
     }
 
-    // Create checkout without requiring user account
-    // LemonSqueezy will collect email during checkout if not provided
     const checkoutData: Record<string, unknown> = {
       custom: {
         plan: priceId,
@@ -52,7 +44,6 @@ router.post('/create', checkoutLimiter, async (req: Request, res: Response) => {
       },
     };
 
-    // Pre-fill email if provided
     if (email) {
       checkoutData.email = email;
     }
@@ -106,11 +97,6 @@ router.post('/create', checkoutLimiter, async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /checkout/verify-session
- * Verify a checkout session after payment and return user token + download URLs
- * This is called by the success page after LemonSqueezy redirects back
- */
 router.post('/verify-session', async (req: Request, res: Response) => {
   try {
     const schema = z.object({
@@ -128,7 +114,6 @@ router.post('/verify-session', async (req: Request, res: Response) => {
 
     const { email } = validation.data;
 
-    // Find user by email
     const user = await prisma.user.findUnique({
       where: { email },
       include: { subscription: true },
@@ -142,14 +127,12 @@ router.post('/verify-session', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check subscription status - may need to poll for webhook
     let subscription = user.subscription;
     let attempts = 0;
     const maxAttempts = 5;
 
-    // Poll for subscription if not found (webhook may take a moment)
     while (!subscription && attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
       subscription = await prisma.subscription.findUnique({
         where: { userId: user.id },
       });
@@ -164,7 +147,6 @@ router.post('/verify-session', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check if user has active subscription or is SUPERUSER
     if (!hasActiveSubscriptionOrIsSuperuser(user.role, subscription)) {
       res.status(403).json({
         error: 'Subscription is not active',
@@ -173,18 +155,15 @@ router.post('/verify-session', async (req: Request, res: Response) => {
       return;
     }
 
-    // Generate JWT token
     const token = generateToken({
       userId: user.id,
       email: user.email,
       role: user.role,
     });
 
-    // Get current version (from env or default)
     const currentVersion = APP_VERSION;
     const apiBaseUrl = process.env.API_BASE_URL || 'https://api.prmanager.app';
 
-    // Generate signed download URLs
     const downloadUrls = generateAllSignedUrls(user.id, currentVersion, apiBaseUrl);
 
     res.json({
@@ -211,11 +190,6 @@ router.post('/verify-session', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /checkout/downloads
- * Get signed download URLs for authenticated users
- * Requires Bearer token authentication
- */
 router.get('/downloads', authenticate, async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
@@ -228,7 +202,6 @@ router.get('/downloads', authenticate, async (req: Request, res: Response) => {
       return;
     }
 
-    // Check if user has active subscription or is SUPERUSER
     if (!hasActiveSubscriptionOrIsSuperuser(user.role, user.subscription)) {
       res.status(403).json({
         error: 'Active subscription required',

@@ -17,9 +17,6 @@ interface PaginatedResponse<T> {
   pagination: PaginationInfo;
 }
 
-/**
- * Helper to build query string from params object
- */
 function buildQueryString(params: Record<string, any>): string {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -32,10 +29,6 @@ function buildQueryString(params: Record<string, any>): string {
 }
 
 export const adminService = {
-  /**
-   * Users Management
-   */
-
   async getUsers(params: {
     page?: number;
     limit?: number;
@@ -80,10 +73,6 @@ export const adminService = {
     return response.json();
   },
 
-  /**
-   * Sessions Management
-   */
-
   async getSessions(params: { page?: number; limit?: number } = {}) {
     const query = buildQueryString(params);
     const response = await httpGet(`${API_URL}/admin/sessions${query}`);
@@ -110,10 +99,6 @@ export const adminService = {
     return response.json();
   },
 
-  /**
-   * Subscriptions Management
-   */
-
   async getSubscriptions(params: { page?: number; limit?: number; status?: string } = {}) {
     const query = buildQueryString(params);
     const response = await httpGet(`${API_URL}/admin/subscriptions${query}`);
@@ -137,10 +122,6 @@ export const adminService = {
     if (!response.ok) throw new Error('Failed to update subscription status');
     return response.json();
   },
-
-  /**
-   * Webhooks Management
-   */
 
   async getWebhooks(params: {
     page?: number;
@@ -166,10 +147,6 @@ export const adminService = {
     return response.json();
   },
 
-  /**
-   * Audit Logs
-   */
-
   async getAuditLogs(params: {
     page?: number;
     limit?: number;
@@ -184,10 +161,6 @@ export const adminService = {
     if (!response.ok) throw new Error('Failed to fetch audit logs');
     return response.json();
   },
-
-  /**
-   * System Configuration
-   */
 
   async getConfig() {
     const response = await httpGet(`${API_URL}/admin/config`);
@@ -212,10 +185,6 @@ export const adminService = {
     if (!response.ok) throw new Error('Failed to delete config');
     return response.json();
   },
-
-  /**
-   * System Health
-   */
 
   async getHealth(): Promise<SystemHealth> {
     const response = await httpGet(`${API_URL}/admin/health`);

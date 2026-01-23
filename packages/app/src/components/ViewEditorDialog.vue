@@ -9,7 +9,6 @@
       </div>
 
       <div class="dialog-body">
-        <!-- Step indicator -->
         <div class="step-indicator" v-if="!isEditing">
           <div class="step" :class="{ active: currentStep === 1, completed: currentStep > 1 }">
             <span class="step-number">1</span>
@@ -22,7 +21,6 @@
           </div>
         </div>
 
-        <!-- Step 1: Choose template or start from scratch -->
         <div v-if="currentStep === 1" class="step-content">
           <p class="step-intro">Start with a template or create from scratch</p>
 
@@ -127,9 +125,7 @@
           </div>
         </div>
 
-        <!-- Step 2: Configure the view -->
         <div v-if="currentStep === 2" class="step-content">
-          <!-- View Name and Icon (always shown) -->
           <div class="form-row">
             <div class="form-group flex-grow">
               <label for="view-name">View name</label>
@@ -154,7 +150,6 @@
             </div>
           </div>
 
-          <!-- Repository Selector (for repo-specific, scratch) -->
           <div v-if="showRepositorySelector" class="form-group">
             <label>Repositories</label>
             <RepositorySelector
@@ -165,7 +160,6 @@
             />
           </div>
 
-          <!-- Labels input (for by-label, scratch) -->
           <div v-if="showLabelsInput" class="form-group">
             <label for="view-labels">Labels</label>
             <input
@@ -177,7 +171,6 @@
             <span class="hint">Comma-separated list of labels to filter by</span>
           </div>
 
-          <!-- Authors input (for team-prs, scratch) -->
           <div v-if="showAuthorsInput" class="form-group">
             <label for="view-authors">Authors</label>
             <input
@@ -189,7 +182,6 @@
             <span class="hint">Comma-separated list of GitHub usernames</span>
           </div>
 
-          <!-- Advanced query (for advanced template) -->
           <div v-if="showAdvancedQuery" class="form-group">
             <label for="custom-query">GitHub search query</label>
             <textarea
@@ -211,7 +203,6 @@
             </span>
           </div>
 
-          <!-- Quick filters (for most templates) -->
           <div v-if="showQuickFilters" class="quick-filters">
             <h4>Filters</h4>
             <div class="filter-grid">
@@ -246,7 +237,6 @@
             </div>
           </div>
 
-          <!-- Query Preview -->
           <div v-if="queryPreview" class="query-preview">
             <h4>
               <Code :size="14" :stroke-width="2" />
@@ -317,7 +307,6 @@ const isEditing = computed(() => !!props.view);
 const currentStep = ref(isEditing.value ? 2 : 1);
 const selectedTemplate = ref<TemplateType | null>(isEditing.value ? 'scratch' : null);
 
-// Form data
 const formData = ref<ViewEditorFormData>({
   name: props.view?.name || '',
   icon: props.view?.icon || '',
@@ -332,14 +321,12 @@ const formData = ref<ViewEditorFormData>({
   applyExplicitReviewerFilter: props.view?.applyExplicitReviewerFilter ?? false,
 });
 
-// Input fields
 const selectedRepositories = ref<string[]>([]);
 const labelsInput = ref('');
 const authorsInput = ref('');
 const includeDrafts = ref(false);
 const error = ref('');
 
-// Computed: what to show based on template
 const showRepositorySelector = computed(() =>
   ['scratch', 'repo-specific', 'by-label', 'team-prs'].includes(selectedTemplate.value || '')
 );
@@ -360,19 +347,16 @@ const showQuickFilters = computed(() =>
   !['advanced'].includes(selectedTemplate.value || '')
 );
 
-// For my-prs template, we use the custom query but still show filters
 const isMyPrsTemplate = computed(() =>
   selectedTemplate.value === 'my-prs'
 );
 
-// Validation
 const isValid = computed(() => {
   if (!formData.value.name.trim()) return false;
   if (selectedTemplate.value === 'advanced' && !formData.value.customQuery?.trim()) return false;
   return true;
 });
 
-// Query preview
 const queryPreview = computed(() => {
   if (selectedTemplate.value === 'advanced') {
     return formData.value.customQuery || '';
@@ -426,7 +410,6 @@ function goToStep2(): void {
   }
 }
 
-// Parse comma-separated inputs
 function parseCommaSeparated(input: string): string[] {
   return input
     .split(',')
@@ -434,16 +417,12 @@ function parseCommaSeparated(input: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-// Build query template from form data
 function buildQueryTemplate(data: ViewEditorFormData): string {
-  // For my-prs template, build a specific query
   if (selectedTemplate.value === 'my-prs') {
     const parts: string[] = ['is:pr', 'author:{{username}}'];
 
-    // State filter
     if (data.state) parts.push(`is:${data.state}`);
 
-    // Draft filter
     if (!includeDrafts.value) {
       parts.push('-is:draft');
     }
@@ -451,12 +430,10 @@ function buildQueryTemplate(data: ViewEditorFormData): string {
     return parts.join(' ');
   }
 
-  // For advanced template, use custom query directly
   if (data.customQuery && data.customQuery.trim() && selectedTemplate.value === 'advanced') {
     return data.customQuery.trim();
   }
 
-  // For review-requested template
   if (selectedTemplate.value === 'review-requested') {
     const parts: string[] = ['is:pr', 'review-requested:{{username}}'];
     if (data.state) parts.push(`is:${data.state}`);
@@ -466,32 +443,26 @@ function buildQueryTemplate(data: ViewEditorFormData): string {
 
   const parts: string[] = ['is:pr'];
 
-  // State filter
   if (data.state) parts.push(`is:${data.state}`);
 
-  // Draft filter
   if (!includeDrafts.value) {
     parts.push('-is:draft');
   }
 
-  // Repositories filter
   if (selectedRepositories.value.length > 0) {
     parts.push(...selectedRepositories.value.map((r) => `repo:${r}`));
   }
 
-  // Labels filter
   const labels = parseCommaSeparated(labelsInput.value);
   if (labels.length > 0) {
     parts.push(...labels.map((l) => `label:${l}`));
   }
 
-  // Authors filter
   const authors = parseCommaSeparated(authorsInput.value);
   if (authors.length > 0) {
     parts.push(...authors.map((a) => `author:${a}`));
   }
 
-  // If no specific user filter, add involves:{{username}}
   if (authors.length === 0) {
     parts.push('involves:{{username}}');
   }
@@ -499,7 +470,6 @@ function buildQueryTemplate(data: ViewEditorFormData): string {
   return parts.join(' ');
 }
 
-// Build filter function from form data
 function buildFilterFunction(data: ViewEditorFormData): ((pr: PullRequestBasic, username: string) => boolean) | undefined {
   if (data.reviewStatus && !data.customQuery) {
     return (pr: PullRequestBasic, username: string) => {
@@ -520,7 +490,6 @@ function buildFilterFunction(data: ViewEditorFormData): ((pr: PullRequestBasic, 
   return undefined;
 }
 
-// Build sorter function from form data
 function buildSorterFunction(data: ViewEditorFormData): ((a: PullRequestBasic, b: PullRequestBasic) => number) | undefined {
   if (data.sortBy === 'created') {
     return (a: PullRequestBasic, b: PullRequestBasic) => {
@@ -577,11 +546,8 @@ function handleSave(): void {
   emit('save', newView);
 }
 
-// Initialize for editing
 onMounted(() => {
   if (isEditing.value && props.view) {
-    // Try to parse existing query to populate fields
-    // This is a best-effort attempt for simple queries
     selectedTemplate.value = 'scratch';
   }
 });
@@ -601,7 +567,6 @@ onMounted(() => {
   z-index: 1000;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  /* GPU acceleration to prevent flickering */
   will-change: opacity;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -656,7 +621,6 @@ onMounted(() => {
   flex: 1;
 }
 
-/* Step indicator */
 .step-indicator {
   display: flex;
   align-items: center;
@@ -717,7 +681,6 @@ onMounted(() => {
   background: var(--color-accent-primary);
 }
 
-/* Step content */
 .step-content {
   display: flex;
   flex-direction: column;
@@ -731,7 +694,6 @@ onMounted(() => {
   font-size: 14px;
 }
 
-/* Templates grid */
 .templates-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -792,7 +754,6 @@ onMounted(() => {
   line-height: 1.4;
 }
 
-/* Form styles */
 .form-row {
   display: flex;
   gap: var(--spacing-md);
@@ -872,7 +833,6 @@ onMounted(() => {
   text-decoration: underline;
 }
 
-/* Quick filters */
 .quick-filters {
   background: var(--color-surface-primary);
   border: 1px solid var(--color-border-tertiary);
@@ -931,7 +891,6 @@ onMounted(() => {
   cursor: pointer;
 }
 
-/* Query preview */
 .query-preview {
   background: var(--color-surface-secondary);
   border: 1px solid var(--color-border-tertiary);
@@ -968,7 +927,6 @@ onMounted(() => {
   margin-top: var(--spacing-md);
 }
 
-/* Footer */
 .dialog-footer {
   display: flex;
   align-items: center;

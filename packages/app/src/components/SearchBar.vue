@@ -53,7 +53,6 @@ function handleClear() {
   inputRef.value?.blur();
 }
 
-// Expose focus method for parent components
 defineExpose({
   focus: () => inputRef.value?.focus(),
 });

@@ -2,6 +2,10 @@ import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import * as Sentry from '@sentry/node';
+import { initSentry } from './lib/sentry.js';
+
+initSentry();
 
 import authRoutes from './routes/auth.js';
 import subscriptionRoutes from './routes/subscription.js';
@@ -20,7 +24,6 @@ import logger from './lib/logger.js';
 export function createApp() {
   const app = express();
 
-  // CORS configuration
   const corsOptions = {
     origin: process.env.CORS_ORIGINS?.split(',') || [
       'http://localhost:5173',
@@ -31,11 +34,8 @@ export function createApp() {
   };
 
   app.use(cors(corsOptions));
-
-  // Request logging (early to capture all requests)
   app.use(requestLogger);
 
-  // Security headers
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
@@ -45,20 +45,13 @@ export function createApp() {
         imgSrc: ["'self'", "data:", "https:"],
       },
     },
-    crossOriginEmbedderPolicy: false, // Allow embedding from other origins (needed for some integrations)
+    crossOriginEmbedderPolicy: false,
   }));
 
-  // Webhook routes need raw body for LemonSqueezy signature verification
-  // Must be before express.json() middleware
   app.use('/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
-
-  // JSON body parser for other routes
   app.use(express.json());
-
-  // Global rate limiter (applies to all routes)
   app.use(globalLimiter);
 
-  // Health check endpoint (no rate limit)
   app.get('/health', (req: Request, res: Response) => {
     res.json({
       status: 'ok',
@@ -67,24 +60,20 @@ export function createApp() {
     });
   });
 
-  // API routes
   app.use('/auth', authRoutes);
   app.use('/subscription', subscriptionRoutes);
   app.use('/checkout', checkoutRoutes);
   app.use('/download', downloadRoutes);
   app.use('/admin', adminRoutes);
 
-  // 404 handler
   app.use((req: Request, res: Response) => {
     res.status(404).json({ error: 'Not found' });
   });
 
-  // Error logging middleware (logs errors with request context)
   app.use(errorLogger);
+  Sentry.setupExpressErrorHandler(app);
 
-  // Global error handler
-  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-    // Error already logged by errorLogger middleware
+  app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
     const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
 
     res.status(statusCode).json({

@@ -1,22 +1,17 @@
 <template>
   <div class="title-bar" :class="{ 'title-bar--macos': isMac }">
-    <!-- Drag region - the entire bar is draggable -->
     <div class="title-bar__drag-region">
-      <!-- Left side: macOS traffic lights space or app title -->
       <div class="title-bar__left">
         <slot name="left"></slot>
       </div>
 
-      <!-- Center: Optional title -->
       <div class="title-bar__center">
         <slot name="center"></slot>
       </div>
 
-      <!-- Right side: App controls + Window controls -->
       <div class="title-bar__right">
         <slot name="right"></slot>
 
-        <!-- Window controls (Windows/Linux only) -->
         <div v-if="showWindowControls" class="window-controls">
           <button
             class="window-control window-control--minimize"
@@ -75,18 +70,14 @@ function close() {
   sendIpc('hide-window');
 }
 
-// Listen for maximize state changes
 function handleMaximizeChange(_event: Event, maximized: boolean) {
   isMaximized.value = maximized;
 }
 
 onMounted(() => {
-  // We'd need to set up IPC listener for maximize state
-  // For now, we'll just track it locally
 });
 
 onUnmounted(() => {
-  // Cleanup listeners if needed
 });
 </script>
 
@@ -100,7 +91,6 @@ onUnmounted(() => {
 }
 
 .title-bar--macos {
-  /* On macOS, leave space for traffic lights */
   padding-left: 78px;
 }
 
@@ -135,7 +125,6 @@ onUnmounted(() => {
   flex: 0 0 auto;
 }
 
-/* Window Controls */
 .window-controls {
   display: flex;
   align-items: center;
@@ -173,7 +162,6 @@ onUnmounted(() => {
   background: #bf0f1d;
 }
 
-/* SVG styling */
 .window-control svg {
   display: block;
 }

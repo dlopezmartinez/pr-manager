@@ -2,7 +2,6 @@
   <Teleport to="body">
     <div class="settings-overlay" @click.self="$emit('close')">
       <div class="settings-modal" :class="{ 'settings-modal--macos': isMac }">
-        <!-- Use TitleBar for consistency with main view -->
         <TitleBar>
           <template #left>
             <h1 class="settings-title">Settings</h1>
@@ -15,7 +14,6 @@
         </TitleBar>
 
         <div class="settings-content">
-          <!-- Provider Section -->
           <section class="settings-section">
             <h3>Git Provider</h3>
 
@@ -63,7 +61,6 @@
             </div>
           </section>
 
-          <!-- Account Section -->
           <section class="settings-section">
             <h3>Account</h3>
 
@@ -94,7 +91,6 @@
             </div>
           </section>
 
-          <!-- Display Section -->
           <section class="settings-section">
             <h3>Display</h3>
             
@@ -184,7 +180,6 @@
             </div>
           </section>
 
-          <!-- Polling Section -->
           <section class="settings-section">
             <h3>Auto-refresh</h3>
             
@@ -231,7 +226,6 @@
             </div>
           </section>
 
-          <!-- Notifications Section -->
           <section class="settings-section">
             <h3>Notifications</h3>
             
@@ -302,7 +296,6 @@
             </div>
           </section>
 
-          <!-- Follow-up Section -->
           <section class="settings-section">
             <h3>Follow-up</h3>
 
@@ -370,7 +363,6 @@
             </div>
           </section>
 
-          <!-- Performance Section -->
           <section class="settings-section">
             <h3>Performance</h3>
 
@@ -388,7 +380,6 @@
             </div>
           </section>
 
-          <!-- Filtering Section -->
           <section class="settings-section">
             <h3>Filtering</h3>
             
@@ -406,13 +397,11 @@
             </div>
           </section>
 
-          <!-- Custom Views Section (slot for ViewManager) -->
           <section v-if="$slots.views" class="settings-section">
             <h3>Custom Views</h3>
             <slot name="views"></slot>
           </section>
 
-          <!-- About Section -->
           <section class="settings-section about-section">
             <h3>About</h3>
             <div class="setting-row">
@@ -435,24 +424,20 @@
       </div>
     </div>
 
-    <!-- Token Change Modal -->
     <div v-if="showTokenModal" class="settings-overlay" @click.self="closeTokenModal">
       <div class="token-modal">
         <h3>Change {{ config.providerType === 'github' ? 'GitHub' : 'GitLab' }} Token</h3>
 
-        <!-- Token Validation Error - Detailed View -->
         <div v-if="tokenValidationResult && !tokenValidationResult.valid" class="token-validation-error">
           <div class="validation-header">
             <AlertCircle :size="20" :stroke-width="2" />
             <span>Token validation failed</span>
           </div>
 
-          <!-- Invalid/Expired Token -->
           <div v-if="tokenValidationResult.error && tokenValidationResult.scopes.length === 0" class="validation-detail">
             <p class="validation-message">{{ tokenValidationResult.error }}</p>
           </div>
 
-          <!-- Missing Scopes -->
           <div v-else-if="tokenValidationResult.missingScopes.length > 0" class="validation-detail">
             <div class="scopes-comparison">
               <div class="scopes-column">
@@ -484,7 +469,6 @@
           </button>
         </div>
 
-        <!-- Default help (when no error) -->
         <div v-else class="token-help-detailed">
           <div class="required-scopes-info">
             <span class="scopes-title">Required scopes:</span>
@@ -541,7 +525,6 @@ import { followedCount, clearAllFollowed } from '../stores/followUpStore';
 import type { ProviderType } from '../model/provider-types';
 import { ProviderFactory } from '../providers';
 
-// Required scopes info for display
 const GITHUB_REQUIRED_SCOPES_INFO = {
   scopes: ['repo', 'read:org'],
   descriptions: {
@@ -571,7 +554,6 @@ const isMac = computed(() => getPlatform() === 'darwin');
 const localUsername = ref(config.username);
 const localGitlabUrl = ref(config.gitlabUrl || '');
 
-// Provider-specific labels
 const providerTokenLabel = computed(() => {
   return config.providerType === 'github'
     ? 'GitHub Token'
@@ -590,10 +572,8 @@ const newToken = ref('');
 const validatingToken = ref(false);
 const tokenValidationResult = ref<TokenValidationResult | null>(null);
 
-// App version
 const appVersion = ref('');
 
-// Zoom controls
 const ZOOM_STEP = 0.5;
 const minZoom = -3; // ~50%
 const maxZoom = 3;  // ~150%
@@ -649,7 +629,6 @@ onMounted(async () => {
   appVersion.value = await getAppVersion();
 });
 
-// Watch for changes in explicitReviewerOnly and trigger refresh
 watch(() => config.explicitReviewerOnly, () => {
   emit('refresh-needed');
 });
@@ -750,7 +729,6 @@ function openTokenCreationPage() {
   openExternal(url);
 }
 
-// Test notification functions
 const testNotificationSent = ref(false);
 const testNotificationType = ref<'pr' | 'comment' | null>(null);
 
@@ -785,7 +763,6 @@ function showTestFeedback(type: 'pr' | 'comment') {
   }, 2000);
 }
 
-// Follow-up settings
 const followedPRsCount = computed(() => followedCount.value);
 
 function handleClearFollowed() {
@@ -805,7 +782,6 @@ function handleClearFollowed() {
   justify-content: center;
   z-index: 1000;
   animation: fadeIn 0.2s ease;
-  /* GPU acceleration to prevent flickering */
   will-change: opacity;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -827,14 +803,12 @@ function handleClearFollowed() {
   display: flex;
   flex-direction: column;
   animation: slideUp 0.2s ease;
-  /* GPU acceleration and paint isolation */
   will-change: transform, opacity;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   contain: layout paint;
 }
 
-/* Border radius only on macOS */
 .settings-modal--macos {
   border-radius: var(--radius-xl);
 }
@@ -850,7 +824,6 @@ function handleClearFollowed() {
   }
 }
 
-/* Settings title - matches .app-title from App.vue */
 .settings-title {
   font-size: 13px;
   font-weight: 600;
@@ -859,7 +832,6 @@ function handleClearFollowed() {
   color: var(--color-text-primary);
 }
 
-/* Title bar buttons - matches App.vue styles */
 .titlebar-btn {
   background: transparent;
   border: none;
@@ -883,7 +855,6 @@ function handleClearFollowed() {
   flex: 1;
   overflow-y: auto;
   padding: var(--spacing-md);
-  /* Optimize scroll performance */
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
@@ -940,7 +911,6 @@ function handleClearFollowed() {
   gap: 6px;
 }
 
-/* Provider Selector */
 .provider-selector-compact {
   display: flex;
   gap: 6px;
@@ -1023,7 +993,6 @@ function handleClearFollowed() {
   cursor: pointer;
 }
 
-/* Test notification buttons */
 .test-buttons {
   gap: 8px;
 }
@@ -1059,7 +1028,6 @@ function handleClearFollowed() {
   color: var(--color-success);
 }
 
-/* Toggle Switch - Compact */
 .toggle {
   position: relative;
   display: inline-block;
@@ -1128,7 +1096,6 @@ function handleClearFollowed() {
   border-radius: var(--radius-sm);
 }
 
-/* Token Modal */
 .token-modal {
   background: var(--color-bg-elevated);
   border-radius: var(--radius-xl);
@@ -1201,7 +1168,6 @@ function handleClearFollowed() {
   text-decoration: underline;
 }
 
-/* Token Validation Error */
 .token-validation-error {
   background: var(--color-error-bg);
   border: 1px solid var(--color-error);
@@ -1411,7 +1377,6 @@ function handleClearFollowed() {
   to { transform: rotate(360deg); }
 }
 
-/* Zoom Controls in Settings */
 .zoom-controls {
   gap: 8px !important;
 }
@@ -1476,7 +1441,6 @@ function handleClearFollowed() {
   border-color: var(--color-border-primary);
 }
 
-/* Version badge */
 .version-badge {
   display: inline-block;
   padding: 4px 10px;
@@ -1493,7 +1457,6 @@ function handleClearFollowed() {
   padding-top: 8px;
 }
 
-/* Follow-up count badge */
 .follow-count-badge {
   display: inline-flex;
   align-items: center;

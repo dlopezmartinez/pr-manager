@@ -40,7 +40,6 @@ jest --watch
 ```bash
 # Testing configuration
 VITE_API_URL=http://localhost:3000
-VITE_SKIP_AUTH=false
 NODE_ENV=test
 
 # Test runner

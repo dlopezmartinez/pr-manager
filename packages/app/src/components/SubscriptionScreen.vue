@@ -1,7 +1,6 @@
 <template>
   <div class="subscription-screen">
     <div class="subscription-container">
-      <!-- Trial Expired / No Subscription -->
       <div v-if="!authStore.isActive.value" class="subscription-content">
         <div class="icon-container warning">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -45,7 +44,6 @@
         </div>
       </div>
 
-      <!-- Active Subscription Info -->
       <div v-else class="subscription-content">
         <div class="icon-container success">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -136,8 +134,6 @@ async function handleSubscribe() {
 
   try {
     await authStore.openCheckout(selectedPlan.value);
-    // The checkout will open in the browser
-    // User will be redirected back to the app after payment
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to open checkout';
   } finally {

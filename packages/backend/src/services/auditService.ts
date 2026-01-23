@@ -8,13 +8,9 @@ interface LogAuditParams {
   targetUserId?: string;
   changes?: Record<string, any>;
   metadata?: Record<string, any>;
-  secretName?: string; // For admin secret tracking
+  secretName?: string;
 }
 
-/**
- * Log an audit action to the database
- * Failures are logged but do not block operations (non-blocking audit)
- */
 export async function logAudit({
   action,
   performedBy,
@@ -36,13 +32,9 @@ export async function logAudit({
     logger.info('Audit log created', { action, performedBy, targetUserId });
   } catch (error) {
     logger.error('Failed to create audit log', { error, action, performedBy });
-    // No throw - audit log must not block operations
   }
 }
 
-/**
- * Get audit logs with optional filtering
- */
 export async function getAuditLogs(filters?: {
   action?: AuditAction;
   performedBy?: string;
@@ -53,7 +45,7 @@ export async function getAuditLogs(filters?: {
   limit?: number;
 }) {
   const page = filters?.page || 1;
-  const limit = Math.min(filters?.limit || 50, 100); // Max 100 per page
+  const limit = Math.min(filters?.limit || 50, 100);
   const skip = (page - 1) * limit;
 
   const where: Prisma.AuditLogWhereInput = {};

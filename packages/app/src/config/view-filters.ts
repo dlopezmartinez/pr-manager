@@ -1,17 +1,4 @@
-/**
- * Predefined View Filters and Sorters
- *
- * SECURITY: This module provides safe, predefined filter and sorter functions
- * to avoid using `new Function()` which can lead to code injection vulnerabilities.
- *
- * Custom views can only use filters and sorters defined here.
- */
-
 import type { PullRequestBasic } from '../model/types';
-
-// =============================================================================
-// FILTER DEFINITIONS
-// =============================================================================
 
 export type FilterId =
   | 'none'
@@ -32,9 +19,6 @@ export interface FilterDefinition {
   fn: (pr: PullRequestBasic, username: string) => boolean;
 }
 
-/**
- * Registry of all available filters
- */
 export const FILTERS: Record<FilterId, FilterDefinition> = {
   'none': {
     id: 'none',
@@ -115,10 +99,6 @@ export const FILTERS: Record<FilterId, FilterDefinition> = {
   },
 };
 
-// =============================================================================
-// SORTER DEFINITIONS
-// =============================================================================
-
 export type SorterId =
   | 'updated-desc'
   | 'updated-asc'
@@ -136,9 +116,6 @@ export interface SorterDefinition {
   fn: (a: PullRequestBasic, b: PullRequestBasic) => number;
 }
 
-/**
- * Registry of all available sorters
- */
 export const SORTERS: Record<SorterId, SorterDefinition> = {
   'updated-desc': {
     id: 'updated-desc',
@@ -197,14 +174,6 @@ export const SORTERS: Record<SorterId, SorterDefinition> = {
   },
 };
 
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Get a filter function by ID
- * Returns a no-op filter if ID is not found
- */
 export function getFilterById(filterId: FilterId | string | undefined): FilterDefinition {
   if (!filterId || !(filterId in FILTERS)) {
     return FILTERS['none'];
@@ -212,10 +181,6 @@ export function getFilterById(filterId: FilterId | string | undefined): FilterDe
   return FILTERS[filterId as FilterId];
 }
 
-/**
- * Get a sorter function by ID
- * Returns default sorter (updated-desc) if ID is not found
- */
 export function getSorterById(sorterId: SorterId | string | undefined): SorterDefinition {
   if (!sorterId || !(sorterId in SORTERS)) {
     return SORTERS['updated-desc'];
@@ -223,16 +188,10 @@ export function getSorterById(sorterId: SorterId | string | undefined): SorterDe
   return SORTERS[sorterId as SorterId];
 }
 
-/**
- * Get all available filters as array
- */
 export function getAllFilters(): FilterDefinition[] {
   return Object.values(FILTERS);
 }
 
-/**
- * Get all available sorters as array
- */
 export function getAllSorters(): SorterDefinition[] {
   return Object.values(SORTERS);
 }

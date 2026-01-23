@@ -3,33 +3,15 @@ import type { PullRequestBasic, PageInfo } from '../model/types';
 import type { ViewConfig } from '../model/view-types';
 import { configStore } from '../stores/configStore';
 
-/**
- * View data result interface
- */
 export interface ViewData {
   prs: PullRequestBasic[];
   pageInfo: PageInfo;
 }
 
-/**
- * Default sorter: sort by updatedAt descending
- */
 const DEFAULT_SORTER = (a: PullRequestBasic, b: PullRequestBasic): number => {
   return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
 };
 
-/**
- * ViewAdapter - Generic data fetcher for any view configuration
- *
- * Replaces DashboardAdapter with a more flexible, view-based approach.
- * Supports:
- * - Single or multiple query execution
- * - Automatic deduplication
- * - Custom filtering and sorting per view
- * - myReviewStatus computation
- *
- * Now uses IPullRequestManager interface to support multiple Git providers.
- */
 export class ViewAdapter {
   private manager: IPullRequestManager;
 
@@ -37,15 +19,6 @@ export class ViewAdapter {
     this.manager = manager;
   }
 
-  /**
-   * Fetch data for a specific view
-   *
-   * @param view - View configuration defining queries, filters, and sorting
-   * @param username - GitHub username (optional, will be fetched if not provided)
-   * @param limit - Maximum results per page (defaults to view.pageSize or 20)
-   * @param after - Pagination cursor
-   * @returns View data with PRs and pagination info
-   */
   async getViewData(
     view: ViewConfig,
     username?: string,
@@ -96,19 +69,11 @@ export class ViewAdapter {
     };
   }
 
-  /**
-   * Build query strings from view config
-   * Handles both single and multiple queries
-   */
   private buildQueries(view: ViewConfig, username: string): string[] {
     const queryResult = view.queryBuilder(username);
     return Array.isArray(queryResult) ? queryResult : [queryResult];
   }
 
-  /**
-   * Deduplicate PRs by ID
-   * Keeps the first occurrence of each PR
-   */
   private deduplicatePRs(prs: PullRequestBasic[]): PullRequestBasic[] {
     const uniqueMap = new Map<string, PullRequestBasic>();
 
@@ -122,17 +87,12 @@ export class ViewAdapter {
   }
 
   /**
-   * Compute myReviewStatus for PRs
-   * Adds a field indicating the user's relationship to each PR
-   *
+   * Compute myReviewStatus for PRs.
    * Possible values:
    * - 'author': User is the PR author
    * - 'pending': User is requested as reviewer and hasn't made a formal review yet
    * - 'reviewed': User has submitted a formal review (APPROVED or CHANGES_REQUESTED)
    * - 'none': No special relationship
-   *
-   * Note: Commenting on a PR doesn't mark it as 'reviewed'. Only formal reviews (APPROVED/CHANGES_REQUESTED) do.
-   * This computation is needed for views that filter by review status
    */
   private computeReviewStatus(prs: PullRequestBasic[], username: string): PullRequestBasic[] {
     return prs.map((pr) => {
@@ -171,14 +131,6 @@ export class ViewAdapter {
     });
   }
 
-  /**
-   * Apply explicit reviewer filter
-   * Only keeps PRs where user is:
-   * 1. The author, OR
-   * 2. Explicitly assigned as reviewer (not via team)
-   *
-   * This filter is applied globally when configStore.explicitReviewerOnly is true
-   */
   private applyExplicitReviewerFilter(
     prs: PullRequestBasic[],
     username: string
@@ -199,12 +151,6 @@ export class ViewAdapter {
     });
   }
 
-  /**
-   * Helper method to fetch data for "All Assigned" view
-   * This replicates the exact behavior of the old DashboardAdapter
-   *
-   * @deprecated Use getViewData with VIEW_ALL_ASSIGNED instead
-   */
   async getDashboardData(username?: string, limit = 20, after?: string): Promise<ViewData> {
     const userTarget = username || (await this.manager.getCurrentUser());
 

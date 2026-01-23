@@ -1,27 +1,11 @@
-/**
- * Platform Detection and Configuration Module
- * Centralizes all platform-specific logic for better maintainability
- */
-
 export type Platform = 'darwin' | 'win32' | 'linux';
 
-/**
- * Current platform
- */
 export const currentPlatform: Platform = process.platform as Platform;
 
-/**
- * Platform checks
- */
 export const isMac = currentPlatform === 'darwin';
 export const isWindows = currentPlatform === 'win32';
 export const isLinux = currentPlatform === 'linux';
 
-/**
- * Window configuration per platform
- * Discord-like design: frameless with custom controls on Windows/Linux,
- * native traffic lights on macOS
- */
 export interface WindowConfig {
   frame: boolean;
   titleBarStyle?: 'hidden' | 'hiddenInset' | 'default';
@@ -36,7 +20,6 @@ export interface WindowConfig {
 
 export function getWindowConfig(): WindowConfig {
   if (isMac) {
-    // macOS: Native traffic lights integrated into the content
     return {
       frame: false,
       titleBarStyle: 'hiddenInset',
@@ -50,7 +33,6 @@ export function getWindowConfig(): WindowConfig {
     };
   }
 
-  // Windows & Linux: Fully frameless with custom controls
   return {
     frame: false,
     resizable: true,
@@ -62,9 +44,6 @@ export function getWindowConfig(): WindowConfig {
   };
 }
 
-/**
- * Tray icon configuration per platform
- */
 export interface TrayIconConfig {
   useTemplateImage: boolean;
   iconColor: 'black' | 'white';
@@ -84,12 +63,6 @@ export function getTrayIconConfig(): TrayIconConfig {
   };
 }
 
-/**
- * Notification configuration per platform
- *
- * We use Electron's native Notification API on all platforms for consistency
- * and better reliability. node-notifier has been removed due to issues on Windows.
- */
 export interface NotificationConfig {
   supportsSubtitle: boolean;
   requiresIcon: boolean;
@@ -103,16 +76,12 @@ export function getNotificationConfig(): NotificationConfig {
     };
   }
 
-  // Windows and Linux: no subtitle support, icon required
   return {
     supportsSubtitle: false,
     requiresIcon: true,
   };
 }
 
-/**
- * Window positioning logic per platform
- */
 export interface WindowPosition {
   x: number;
   y: number;
@@ -152,16 +121,10 @@ export function calculateWindowPosition(
   return { x, y };
 }
 
-/**
- * App lifecycle behavior per platform
- */
 export function shouldQuitOnAllWindowsClosed(): boolean {
   return !isMac;
 }
 
-/**
- * Tray title support (only macOS)
- */
 export function supportsTrayTitle(): boolean {
   return isMac;
 }

@@ -1,6 +1,5 @@
 <template>
   <div class="welcome-container">
-    <!-- Title Bar -->
     <TitleBar>
       <template #left>
         <span class="screen-title">Welcome</span>
@@ -8,7 +7,6 @@
     </TitleBar>
 
     <div class="welcome-content">
-      <!-- Header Section -->
       <div class="welcome-header">
         <div class="app-icon">
           <GitMerge :size="40" :stroke-width="1.5" />
@@ -18,7 +16,6 @@
       </div>
 
       <div class="welcome-form">
-        <!-- Provider Selection -->
         <div class="form-section">
           <h2>Select Provider</h2>
           <div class="provider-selector">
@@ -35,7 +32,6 @@
           </div>
         </div>
 
-        <!-- GitLab URL (only for GitLab) -->
         <div v-if="selectedProvider === 'gitlab'" class="form-section">
           <h2>GitLab Instance</h2>
           <div class="form-group">
@@ -51,11 +47,9 @@
           </div>
         </div>
 
-        <!-- Authentication Section -->
         <div class="form-section">
           <h2>Authentication</h2>
 
-          <!-- Token Input -->
           <div class="form-group">
             <label for="apiKey">{{ tokenLabel }}</label>
             <div class="input-wrapper">
@@ -82,7 +76,6 @@
             </p>
           </div>
 
-          <!-- Username -->
           <div class="form-group">
             <label for="username">Username <span class="optional">(optional)</span></label>
             <input
@@ -96,13 +89,11 @@
           </div>
         </div>
 
-        <!-- Error Message -->
         <div v-if="error" class="error-message">
           <AlertCircle :size="14" :stroke-width="2" />
           {{ error }}
         </div>
 
-        <!-- Actions -->
         <div class="actions">
           <button
             class="continue-btn"
@@ -117,7 +108,6 @@
           </button>
         </div>
 
-        <!-- Footer -->
         <div class="welcome-footer">
           <Lock :size="12" :stroke-width="2" />
           <p>Your token is stored securely and never shared.</p>
@@ -138,7 +128,6 @@ const emit = defineEmits<{
   (e: 'configured'): void;
 }>();
 
-// Provider options
 const providers = [
   { type: 'github' as ProviderType, name: 'GitHub', icon: Github },
   { type: 'gitlab' as ProviderType, name: 'GitLab', icon: GitMerge },
@@ -154,7 +143,6 @@ const error = ref('');
 
 import { openExternal } from '../utils/electron';
 
-// Computed properties based on provider
 const tokenLabel = computed(() => {
   return selectedProvider.value === 'github'
     ? 'GitHub Personal Access Token'
@@ -293,7 +281,6 @@ async function handleContinue() {
   background: var(--color-bg-secondary);
 }
 
-/* Header */
 .welcome-header {
   text-align: center;
   padding: var(--spacing-lg) 0;
@@ -325,7 +312,6 @@ h1 {
   margin: 0;
 }
 
-/* Form */
 .welcome-form {
   display: flex;
   flex-direction: column;
@@ -333,7 +319,6 @@ h1 {
   flex: 1;
 }
 
-/* Form Sections */
 .form-section {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border-secondary);
@@ -371,7 +356,6 @@ label {
   color: var(--color-text-tertiary);
 }
 
-/* Provider Selector */
 .provider-selector {
   display: flex;
   gap: var(--spacing-sm);
@@ -409,7 +393,6 @@ label {
   font-weight: 600;
 }
 
-/* Input Styles */
 .input-wrapper {
   position: relative;
   display: flex;
@@ -477,7 +460,6 @@ input::placeholder {
   text-decoration: underline;
 }
 
-/* Error Message */
 .error-message {
   display: flex;
   align-items: center;
@@ -489,7 +471,6 @@ input::placeholder {
   font-size: 12px;
 }
 
-/* Actions */
 .actions {
   margin-top: auto;
   padding-top: var(--spacing-md);
@@ -539,7 +520,6 @@ input::placeholder {
   to { transform: rotate(360deg); }
 }
 
-/* Footer */
 .welcome-footer {
   display: flex;
   align-items: center;

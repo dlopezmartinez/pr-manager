@@ -1,9 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyWebhookSignature, LEMONSQUEEZY_CONFIG } from '../lib/lemonsqueezy.js';
 
-/**
- * LemonSqueezy Webhook Event interface
- */
 export interface LemonSqueezyWebhookEvent {
   meta: {
     event_name: string;
@@ -61,9 +58,6 @@ declare global {
   }
 }
 
-/**
- * Middleware to verify LemonSqueezy webhook signature
- */
 export function verifyLemonSqueezyWebhook(req: Request, res: Response, next: NextFunction): void {
   const signature = req.headers['x-signature'] as string;
 
@@ -72,7 +66,6 @@ export function verifyLemonSqueezyWebhook(req: Request, res: Response, next: Nex
     return;
   }
 
-  // Read directly from env to support test environment changes
   const webhookSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET || LEMONSQUEEZY_CONFIG.WEBHOOK_SECRET;
 
   if (!webhookSecret) {
@@ -82,7 +75,6 @@ export function verifyLemonSqueezyWebhook(req: Request, res: Response, next: Nex
   }
 
   try {
-    // req.body can be Buffer (from express.raw), string, or object
     let rawBody: string;
     if (Buffer.isBuffer(req.body)) {
       rawBody = req.body.toString('utf8');
@@ -104,7 +96,6 @@ export function verifyLemonSqueezyWebhook(req: Request, res: Response, next: Nex
       return;
     }
 
-    // Parse the body
     let event: LemonSqueezyWebhookEvent;
     if (Buffer.isBuffer(req.body)) {
       event = JSON.parse(req.body.toString('utf8'));

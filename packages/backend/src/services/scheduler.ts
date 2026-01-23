@@ -1,8 +1,3 @@
-/**
- * Job Scheduler
- * Manages scheduled jobs that run on intervals or at specific times
- */
-
 import { runSubscriptionSync } from '../jobs/syncSubscriptions.js';
 import { processWebhookQueue } from '../jobs/processWebhookQueue.js';
 
@@ -23,17 +18,12 @@ const intervalJobs: IntervalJob[] = [];
 let schedulerRunning = false;
 let schedulerIntervalId: NodeJS.Timeout | null = null;
 
-/**
- * Calculate the next run time for a daily job at a specific hour (UTC)
- */
 function getNextRunTimeForHour(hourUTC: number): Date {
   const now = new Date();
   const next = new Date(now);
 
-  // Set to target hour on today
   next.setUTCHours(hourUTC, 0, 0, 0);
 
-  // If that time has already passed today, schedule for tomorrow
   if (next <= now) {
     next.setDate(next.getDate() + 1);
   }
@@ -41,9 +31,6 @@ function getNextRunTimeForHour(hourUTC: number): Date {
   return next;
 }
 
-/**
- * Register a scheduled job that runs at a specific hour (UTC) every day
- */
 export function scheduleDaily(
   name: string,
   fn: () => Promise<void>,
@@ -52,7 +39,7 @@ export function scheduleDaily(
   const job: ScheduledJob = {
     name,
     fn,
-    intervalMs: 24 * 60 * 60 * 1000, // 24 hours
+    intervalMs: 24 * 60 * 60 * 1000,
     nextRunTime: getNextRunTimeForHour(hourUTC),
   };
 
@@ -60,18 +47,13 @@ export function scheduleDaily(
   console.log(`[Scheduler] Registered job: ${name} (daily at ${hourUTC}:00 UTC)`);
 }
 
-/**
- * Register a job that runs at a fixed interval
- */
 export function scheduleInterval(
   name: string,
   fn: () => Promise<void>,
   intervalMs: number
 ): void {
-  // Run immediately
   fn().catch((err) => console.error(`[Scheduler] ${name} initial run failed:`, err));
 
-  // Then run on interval
   const id = setInterval(() => {
     fn().catch((err) => console.error(`[Scheduler] ${name} failed:`, err));
   }, intervalMs);
@@ -80,9 +62,6 @@ export function scheduleInterval(
   console.log(`[Scheduler] Registered interval job: ${name} (every ${intervalMs / 1000}s)`);
 }
 
-/**
- * Execute a job and handle errors
- */
 async function executeJob(job: ScheduledJob): Promise<void> {
   try {
     console.log(`[Scheduler] Executing job: ${job.name}`);
@@ -97,9 +76,6 @@ async function executeJob(job: ScheduledJob): Promise<void> {
   }
 }
 
-/**
- * Start the scheduler
- */
 export function startScheduler(): void {
   if (schedulerRunning) {
     console.warn('[Scheduler] Scheduler is already running');
@@ -109,27 +85,21 @@ export function startScheduler(): void {
   schedulerRunning = true;
   console.log('[Scheduler] Scheduler started');
 
-  // Register webhook queue processor (every 5 minutes)
   scheduleInterval('webhook-retry', processWebhookQueue, 5 * 60 * 1000);
 
-  // Run scheduler tick every minute
   schedulerIntervalId = setInterval(async () => {
     const now = new Date();
 
     for (const job of jobs) {
-      // Check if job should run
       if (now >= job.nextRunTime) {
-        // Execute job
         await executeJob(job);
 
-        // Schedule next run
         job.nextRunTime = new Date(job.nextRunTime.getTime() + job.intervalMs);
         console.log(`[Scheduler] Next run for ${job.name}: ${job.nextRunTime.toUTCString()}`);
       }
     }
-  }, 60 * 1000); // Check every minute
+  }, 60 * 1000);
 
-  // Also check immediately for any jobs that should run
   const now = new Date();
   for (const job of jobs) {
     if (now >= job.nextRunTime) {
@@ -139,9 +109,6 @@ export function startScheduler(): void {
   }
 }
 
-/**
- * Stop the scheduler gracefully
- */
 export function stopScheduler(): void {
   if (!schedulerRunning) {
     console.log('[Scheduler] Scheduler is not running');
@@ -153,7 +120,6 @@ export function stopScheduler(): void {
     schedulerIntervalId = null;
   }
 
-  // Clear interval jobs
   for (const job of intervalJobs) {
     clearInterval(job.id);
     console.log(`[Scheduler] Stopped interval job: ${job.name}`);
@@ -164,9 +130,6 @@ export function stopScheduler(): void {
   console.log('[Scheduler] Scheduler stopped');
 }
 
-/**
- * Get scheduler status
- */
 export function getSchedulerStatus() {
   return {
     running: schedulerRunning,

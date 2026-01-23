@@ -46,14 +46,12 @@ const imgRef = ref<HTMLImageElement | null>(null);
 const loaded = ref(false);
 const error = ref(false);
 
-// Store observer reference for cleanup
 let observer: IntersectionObserver | null = null;
 
 const initial = computed(() => {
   return props.name?.charAt(0).toUpperCase() || '?';
 });
 
-// Generate consistent color from name
 const placeholderColor = computed(() => {
   const colors = [
     '#007AFF', '#34C759', '#FF9500', '#FF3B30', 
@@ -73,13 +71,11 @@ function onError() {
   loaded.value = false;
 }
 
-// Reset state when src changes
 watch(() => props.src, () => {
   loaded.value = false;
   error.value = false;
 });
 
-// Use Intersection Observer for lazy loading
 onMounted(() => {
   if (!props.src) return;
   
@@ -88,7 +84,6 @@ onMounted(() => {
       (entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            // Image will load automatically via src binding
             observer?.disconnect();
             observer = null;
           }
@@ -100,7 +95,6 @@ onMounted(() => {
   }
 });
 
-// Cleanup observer on unmount
 onUnmounted(() => {
   if (observer) {
     observer.disconnect();

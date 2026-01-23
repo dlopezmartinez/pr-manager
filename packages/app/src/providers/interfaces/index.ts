@@ -1,7 +1,3 @@
-/**
- * Provider interfaces barrel export
- */
-
 export type { IGitProvider } from './IGitProvider';
 export type { IPullRequestManager, ListResult, EnrichedPullRequest } from './IPullRequestManager';
 export type { IReviewsManager, ReviewStatus } from './IReviewsManager';

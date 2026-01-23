@@ -1,11 +1,3 @@
-/**
- * Email Templates
- * HTML templates for transactional emails
- */
-
-/**
- * Password reset email template
- */
 export function passwordResetTemplate(resetUrl: string): string {
   return `
 <!DOCTYPE html>
@@ -37,9 +29,6 @@ export function passwordResetTemplate(resetUrl: string): string {
 </html>`;
 }
 
-/**
- * Payment failed notification email template
- */
 export function paymentFailedTemplate(userName: string, billingUrl: string): string {
   return `
 <!DOCTYPE html>

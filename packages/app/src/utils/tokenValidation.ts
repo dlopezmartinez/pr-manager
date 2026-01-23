@@ -1,11 +1,3 @@
-/**
- * Token Validation Utility
- *
- * Validates GitHub and GitLab personal access tokens by checking:
- * - Token validity (authentication)
- * - Required scopes/permissions
- */
-
 import { fetchWithRetry, HttpError } from './http';
 
 export interface TokenValidationResult {
@@ -16,33 +8,16 @@ export interface TokenValidationResult {
   error?: string;
 }
 
-/**
- * Required scopes for full functionality
- *
- * GitHub:
- * - repo: Full access to repositories (PRs, reviews, comments, merges)
- * - read:org: Read organization membership (to list organization repositories)
- *
- * GitLab:
- * - api: Full API access (read/write)
- */
 export const GITHUB_REQUIRED_SCOPES = ['repo', 'read:org'];
 export const GITLAB_REQUIRED_SCOPES = ['api'];
 
-/**
- * Check if required scopes are present
- */
 function checkScopes(actualScopes: string[], requiredScopes: string[]): string[] {
   const missing: string[] = [];
 
   for (const required of requiredScopes) {
-    // Check if any actual scope matches or is a parent scope
     const hasScope = actualScopes.some(scope => {
-      // Exact match
       if (scope === required) return true;
-      // Parent scope (e.g., 'repo' includes 'repo:status')
       if (required.startsWith(scope + ':')) return true;
-      // Child scope covering parent (e.g., having 'repo' covers 'repo:status')
       if (scope.startsWith(required.split(':')[0]) && !required.includes(':')) return true;
       return false;
     });
@@ -55,11 +30,6 @@ function checkScopes(actualScopes: string[], requiredScopes: string[]): string[]
   return missing;
 }
 
-/**
- * Validate a GitHub personal access token
- *
- * Makes a request to /user and checks X-OAuth-Scopes header
- */
 export async function validateGitHubToken(token: string): Promise<TokenValidationResult> {
   const endpoint = 'https://api.github.com/user';
 
@@ -97,22 +67,17 @@ export async function validateGitHubToken(token: string): Promise<TokenValidatio
       throw HttpError.fromResponse(response, endpoint);
     }
 
-    // Get scopes from response header
     const scopesHeader = response.headers.get('X-OAuth-Scopes') || '';
     const scopes = scopesHeader
       .split(',')
       .map(s => s.trim())
       .filter(s => s.length > 0);
 
-    // Get user info
     const userData = await response.json();
     const username = userData.login;
 
-    // Check for required scopes
     const missingScopes = checkScopes(scopes, GITHUB_REQUIRED_SCOPES);
 
-    // Special case: fine-grained tokens don't return X-OAuth-Scopes
-    // They will have empty scopes but might still work
     const isFineGrained = scopes.length === 0 && response.ok;
 
     if (isFineGrained) {
@@ -153,16 +118,10 @@ export async function validateGitHubToken(token: string): Promise<TokenValidatio
   }
 }
 
-/**
- * Validate a GitLab personal access token
- *
- * Uses /personal_access_tokens/self endpoint to get token info
- */
 export async function validateGitLabToken(
   token: string,
   baseUrl = 'https://gitlab.com'
 ): Promise<TokenValidationResult> {
-  // First try the token info endpoint (available in GitLab 14.0+)
   const tokenEndpoint = `${baseUrl}/api/v4/personal_access_tokens/self`;
 
   try {
@@ -182,7 +141,6 @@ export async function validateGitLabToken(
       const scopes: string[] = tokenData.scopes || [];
       const missingScopes = checkScopes(scopes, GITLAB_REQUIRED_SCOPES);
 
-      // Also get user info
       const userEndpoint = `${baseUrl}/api/v4/user`;
       let username: string | undefined;
 
@@ -215,9 +173,7 @@ export async function validateGitLabToken(
       };
     }
 
-    // If token endpoint fails, fall back to /user endpoint
     if (tokenResponse.status === 404) {
-      // Older GitLab version, just validate with /user
       return validateGitLabTokenFallback(token, baseUrl);
     }
 
@@ -241,7 +197,6 @@ export async function validateGitLabToken(
 
     throw HttpError.fromResponse(tokenResponse, tokenEndpoint);
   } catch (error) {
-    // If endpoint doesn't exist, try fallback
     if (error instanceof HttpError && error.status === 404) {
       return validateGitLabTokenFallback(token, baseUrl);
     }
@@ -264,10 +219,6 @@ export async function validateGitLabToken(
   }
 }
 
-/**
- * Fallback validation for older GitLab versions
- * Just checks if token can access /user endpoint
- */
 async function validateGitLabTokenFallback(
   token: string,
   baseUrl: string
@@ -300,7 +251,6 @@ async function validateGitLabTokenFallback(
 
     const userData = await response.json();
 
-    // We can't determine scopes on older GitLab, assume it's valid if /user works
     return {
       valid: true,
       scopes: ['unknown'],
@@ -318,9 +268,6 @@ async function validateGitLabTokenFallback(
   }
 }
 
-/**
- * Validate a token based on provider type
- */
 export async function validateToken(
   provider: 'github' | 'gitlab',
   token: string,
@@ -342,12 +289,8 @@ export async function validateToken(
   return validateGitLabToken(token, baseUrl);
 }
 
-/**
- * Get human-readable scope descriptions
- */
 export function getScopeDescription(scope: string): string {
   const descriptions: Record<string, string> = {
-    // GitHub scopes
     'repo': 'Full control of private repositories',
     'repo:status': 'Access commit status',
     'repo_deployment': 'Access deployment status',
@@ -358,8 +301,6 @@ export function getScopeDescription(scope: string): string {
     'read:user': 'Read user profile data',
     'user:email': 'Access user email addresses',
     'notifications': 'Access notifications',
-
-    // GitLab scopes
     'api': 'Full API access (read/write)',
     'read_api': 'Read-only API access',
     'read_user': 'Read user information',

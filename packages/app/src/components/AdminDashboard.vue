@@ -30,25 +30,12 @@
           </aside>
 
           <main class="admin-content">
-            <!-- Users Panel -->
             <UsersPanel v-if="activeTab === 'users'" />
-
-            <!-- Sessions Panel -->
             <SessionsPanel v-else-if="activeTab === 'sessions'" />
-
-            <!-- Subscriptions Panel -->
             <SubscriptionsPanel v-else-if="activeTab === 'subscriptions'" />
-
-            <!-- Webhooks Panel -->
             <WebhooksPanel v-else-if="activeTab === 'webhooks'" />
-
-            <!-- Audit Logs Panel -->
             <AuditLogsPanel v-else-if="activeTab === 'audit-logs'" />
-
-            <!-- Config Panel -->
             <ConfigPanel v-else-if="activeTab === 'config'" />
-
-            <!-- Health Panel -->
             <HealthPanel v-else-if="activeTab === 'health'" />
           </main>
         </div>

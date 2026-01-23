@@ -6,10 +6,6 @@ import { getQueryNumber, getQueryString } from '../../utils/queryParams.js';
 
 const router = Router();
 
-/**
- * GET /admin/audit-logs
- * List audit logs with optional filtering
- */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, getQueryNumber(req.query.page) || 1);
@@ -20,7 +16,6 @@ router.get('/', async (req: Request, res: Response) => {
       limit,
     };
 
-    // Add optional filters
     if (req.query.action) {
       filters.action = String(req.query.action);
     }
@@ -33,7 +28,6 @@ router.get('/', async (req: Request, res: Response) => {
       filters.targetUserId = String(req.query.targetUserId);
     }
 
-    // Parse date filters
     if (req.query.startDate) {
       try {
         filters.startDate = new Date(String(req.query.startDate));

@@ -28,19 +28,16 @@
       </select>
     </div>
 
-    <!-- Loading State -->
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
       <p>Loading users...</p>
     </div>
 
-    <!-- Error State -->
     <div v-else-if="error" class="error-state">
       <p>{{ error }}</p>
       <button @click="loadUsers" class="retry-btn">Retry</button>
     </div>
 
-    <!-- Users Table -->
     <div v-else class="table-wrapper">
       <table class="users-table">
         <thead>
@@ -100,7 +97,6 @@
       </table>
     </div>
 
-    <!-- Pagination -->
     <div v-if="!loading && !error && pagination" class="pagination">
       <button @click="previousPage" :disabled="page === 1" class="paginate-btn">
         ← Previous
@@ -133,7 +129,6 @@ let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 const filteredUsers = computed(() => {
   let filtered = [...users.value];
 
-  // Filter by status
   if (filterStatus.value === 'active') {
     filtered = filtered.filter((u) => u.isActive && !u.isSuspended);
   } else if (filterStatus.value === 'inactive') {

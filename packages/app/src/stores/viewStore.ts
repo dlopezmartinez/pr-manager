@@ -4,28 +4,15 @@ import { getFilterById, getSorterById } from '../config/view-filters';
 import type { ViewConfig, ViewId, SerializableViewConfig } from '../model/view-types';
 
 const STORAGE_KEY = 'pr-manager-views';
-const SAVE_DEBOUNCE_MS = 1000; // Debounce localStorage writes
+const SAVE_DEBOUNCE_MS = 1000;
 
-/**
- * View store state interface
- */
 interface ViewStoreState {
-  /** Currently active view ID */
   activeViewId: ViewId;
-
-  /** All views (built-in + custom) */
   views: ViewConfig[];
-
-  /** Custom user-created views (serialized for storage) */
   customViews: SerializableViewConfig[];
-
-  /** Order overrides for all views (including built-in) */
   viewOrders: Record<ViewId, number>;
 }
 
-/**
- * Default state
- */
 const defaultState: ViewStoreState = {
   activeViewId: VIEW_NOTIFICATIONS_ID,
   views: [...DEFAULT_VIEWS],
@@ -33,9 +20,6 @@ const defaultState: ViewStoreState = {
   viewOrders: {},
 };
 
-/**
- * Load persisted state from localStorage
- */
 function loadState(): ViewStoreState {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -72,9 +56,6 @@ function loadState(): ViewStoreState {
   return { ...defaultState };
 }
 
-/**
- * Save state to localStorage (debounced to avoid blocking render)
- */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingState: ViewStoreState | null = null;
 
@@ -82,7 +63,7 @@ function saveState(state: ViewStoreState): void {
   pendingState = state;
 
   if (saveTimer) {
-    return; // Already scheduled
+    return;
   }
 
   saveTimer = setTimeout(() => {
@@ -106,8 +87,8 @@ function saveState(state: ViewStoreState): void {
 }
 
 /**
- * Deserialize a stored view config back to ViewConfig
- * SECURITY: Uses predefined filter/sorter IDs instead of executing arbitrary code
+ * Deserialize a stored view config back to ViewConfig.
+ * Uses predefined filter/sorter IDs instead of executing arbitrary code for security.
  */
 function deserializeView(serializable: SerializableViewConfig): ViewConfig {
   const queryBuilder = (username: string): string => {
@@ -144,10 +125,6 @@ function deserializeView(serializable: SerializableViewConfig): ViewConfig {
   };
 }
 
-/**
- * Serialize a view config for storage
- * Uses filter/sorter IDs for security (no code serialization)
- */
 export function serializeView(view: ViewConfig, filterId?: string, sorterId?: string): SerializableViewConfig {
   let queryTemplate = 'is:pr is:open';
 
@@ -175,16 +152,8 @@ export function serializeView(view: ViewConfig, filterId?: string, sorterId?: st
   };
 }
 
-/**
- * Reactive view store
- * Manages all views and active view state
- */
 export const viewStore = reactive<ViewStoreState>(loadState());
 
-/**
- * Auto-save on changes
- * Watches for state changes and persists to localStorage
- */
 watch(
   () => ({
     activeViewId: viewStore.activeViewId,
@@ -197,17 +166,10 @@ watch(
   { deep: true }
 );
 
-/**
- * Computed: Currently active view
- */
 export const activeView = computed<ViewConfig>(() => {
   return viewStore.views.find((v) => v.id === viewStore.activeViewId) || viewStore.views[0];
 });
 
-/**
- * Computed: Views sorted by order
- * Uses viewOrders as source of truth for ordering (reactive to order changes)
- */
 export const sortedViews = computed<ViewConfig[]>(() => {
   return [...viewStore.views].sort((a, b) => {
     const orderA = viewStore.viewOrders[a.id] ?? a.order ?? 999;
@@ -216,9 +178,6 @@ export const sortedViews = computed<ViewConfig[]>(() => {
   });
 });
 
-/**
- * Action: Set active view by ID
- */
 export function setActiveView(viewId: ViewId): void {
   const view = viewStore.views.find((v) => v.id === viewId);
   if (view) {
@@ -228,10 +187,6 @@ export function setActiveView(viewId: ViewId): void {
   }
 }
 
-/**
- * Action: Add a custom view
- * @throws Error if view with same ID already exists
- */
 export function addCustomView(view: ViewConfig): void {
   if (viewStore.views.some((v) => v.id === view.id)) {
     throw new Error(`View with id "${view.id}" already exists`);
@@ -243,10 +198,6 @@ export function addCustomView(view: ViewConfig): void {
   viewStore.views.push(customView);
 }
 
-/**
- * Action: Update an existing view
- * @throws Error if trying to modify readonly view (except order property)
- */
 export function updateView(viewId: ViewId, updates: Partial<ViewConfig>): void {
   const index = viewStore.views.findIndex((v) => v.id === viewId);
   if (index === -1) {
@@ -274,10 +225,6 @@ export function updateView(viewId: ViewId, updates: Partial<ViewConfig>): void {
   }
 }
 
-/**
- * Action: Delete a view
- * @throws Error if view is readonly
- */
 export function deleteView(viewId: ViewId): void {
   const view = viewStore.views.find((v) => v.id === viewId);
   if (view?.readonly) {
@@ -292,10 +239,6 @@ export function deleteView(viewId: ViewId): void {
   }
 }
 
-/**
- * Action: Reorder views
- * Updates the order property of views
- */
 export function reorderViews(viewIds: ViewId[]): void {
   viewIds.forEach((viewId, index) => {
     const view = viewStore.views.find((v) => v.id === viewId);
@@ -310,23 +253,14 @@ export function reorderViews(viewIds: ViewId[]): void {
   });
 }
 
-/**
- * Get view by ID
- */
 export function getView(viewId: ViewId): ViewConfig | undefined {
   return viewStore.views.find((v) => v.id === viewId);
 }
 
-/**
- * Check if view exists
- */
 export function hasView(viewId: ViewId): boolean {
   return viewStore.views.some((v) => v.id === viewId);
 }
 
-/**
- * Reset to default views (clears all custom views)
- */
 export function resetToDefaults(): void {
   viewStore.views = [...DEFAULT_VIEWS];
   viewStore.customViews = [];

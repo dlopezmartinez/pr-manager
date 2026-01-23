@@ -52,7 +52,6 @@ const parsedBody = computed<BodySegment[]>(() => {
   const text = props.comment.body;
   const segments: BodySegment[] = [];
 
-  // Reset regex lastIndex before each use (required for global regex reuse)
   IMAGE_REGEX.lastIndex = 0;
 
   let lastIndex = 0;
@@ -67,8 +66,6 @@ const parsedBody = computed<BodySegment[]>(() => {
       });
     }
 
-    // Add the image link
-    // match[1] is markdown url, match[2] is html src. One will be defined.
     const imageUrl = match[1] || match[2];
     if (imageUrl) {
       segments.push({
@@ -98,7 +95,6 @@ const parsedBody = computed<BodySegment[]>(() => {
   border-radius: var(--radius-md);
   padding: 10px;
   border: 1px solid var(--color-border-tertiary);
-  /* Fix overflow */
   overflow-wrap: break-word;
   word-wrap: break-word;
   word-break: break-word;

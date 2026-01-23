@@ -55,12 +55,7 @@ function handleTabClick(viewId: ViewId): void {
 
 function handleWheel(event: WheelEvent): void {
   if (!tabsContainer.value) return;
-
-  // Prevent default vertical scroll
   event.preventDefault();
-
-  // Scroll horizontally based on wheel delta
-  // deltaY is vertical wheel movement, we use it for horizontal scroll
   tabsContainer.value.scrollLeft += event.deltaY;
 }
 </script>
@@ -85,7 +80,6 @@ function handleWheel(event: WheelEvent): void {
   overflow-x: auto;
   overflow-y: hidden;
   padding: var(--spacing-xs) 0;
-  /* Custom scrollbar - macOS style */
   scrollbar-width: thin;
   scrollbar-color: var(--color-surface-secondary) transparent;
 }

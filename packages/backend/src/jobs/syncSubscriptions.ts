@@ -1,22 +1,11 @@
-/**
- * Subscription Sync Job
- * Runs nightly to synchronize subscription statuses
- * Handles cases where webhooks may have failed or been delayed
- */
-
 import { prisma } from '../lib/prisma.js';
 
-/**
- * Sync subscriptions that have expired based on currentPeriodEnd
- * Updates status from 'active'/'on_trial' to 'expired' if the end date has passed
- */
 export async function syncExpiredSubscriptions(): Promise<void> {
   const now = new Date();
 
   try {
     console.log('[SyncSubscriptions] Starting subscription sync...');
 
-    // Find all active or trialing subscriptions where currentPeriodEnd has passed
     const expiredSubscriptions = await prisma.subscription.findMany({
       where: {
         status: {
@@ -35,7 +24,6 @@ export async function syncExpiredSubscriptions(): Promise<void> {
 
     console.log(`[SyncSubscriptions] Found ${expiredSubscriptions.length} expired subscriptions to update`);
 
-    // Update all expired subscriptions
     const result = await prisma.subscription.updateMany({
       where: {
         status: {
@@ -57,17 +45,12 @@ export async function syncExpiredSubscriptions(): Promise<void> {
   }
 }
 
-/**
- * Sync trial subscriptions that have reached their trial end date
- * Updates status from 'on_trial' to 'expired' if trialEndsAt has passed
- */
 export async function syncExpiredTrials(): Promise<void> {
   const now = new Date();
 
   try {
     console.log('[SyncSubscriptions] Starting trial sync...');
 
-    // Find all trial subscriptions where trialEndsAt has passed
     const expiredTrials = await prisma.subscription.findMany({
       where: {
         status: 'on_trial',
@@ -85,7 +68,6 @@ export async function syncExpiredTrials(): Promise<void> {
 
     console.log(`[SyncSubscriptions] Found ${expiredTrials.length} expired trials to update`);
 
-    // Update all expired trials
     const result = await prisma.subscription.updateMany({
       where: {
         status: 'on_trial',
@@ -106,9 +88,6 @@ export async function syncExpiredTrials(): Promise<void> {
   }
 }
 
-/**
- * Run all subscription sync operations
- */
 export async function runSubscriptionSync(): Promise<void> {
   try {
     console.log('[SyncSubscriptions] Starting full subscription sync cycle');
@@ -117,6 +96,5 @@ export async function runSubscriptionSync(): Promise<void> {
     console.log('[SyncSubscriptions] Subscription sync cycle completed successfully');
   } catch (error) {
     console.error('[SyncSubscriptions] Subscription sync cycle failed:', error);
-    // Don't re-throw - we want the job to continue on next scheduled run
   }
 }

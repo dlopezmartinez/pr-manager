@@ -19,7 +19,6 @@ export interface AppConfig {
   notifyOnNewComments: boolean;
   prefetchOnHover: boolean;
   explicitReviewerOnly: boolean;
-  // Follow-up settings
   followUpEnabled: boolean;
   followUpNotifyOnCommits: boolean;
   followUpNotifyOnComments: boolean;
@@ -50,7 +49,6 @@ const defaultConfig: AppConfig = {
   notifyOnNewComments: true,
   prefetchOnHover: true,
   explicitReviewerOnly: true,
-  // Follow-up defaults
   followUpEnabled: true,
   followUpNotifyOnCommits: true,
   followUpNotifyOnComments: true,
@@ -82,10 +80,6 @@ function saveConfig(config: AppConfig): void {
 const apiKeyCache = ref<string>('');
 const isApiKeyLoaded = ref<boolean>(false);
 
-/**
- * Load API key from secure storage
- * Call this during app initialization
- */
 export async function loadApiKey(): Promise<string> {
   try {
     const key = await getSecureValue(API_KEY_SECURE_KEY);
@@ -112,9 +106,6 @@ export async function loadApiKey(): Promise<string> {
   }
 }
 
-/**
- * Save API key to secure storage
- */
 export async function saveApiKey(apiKey: string): Promise<boolean> {
   try {
     const success = await setSecureValue(API_KEY_SECURE_KEY, apiKey);
@@ -128,9 +119,6 @@ export async function saveApiKey(apiKey: string): Promise<boolean> {
   }
 }
 
-/**
- * Clear API key from secure storage
- */
 export async function clearApiKey(): Promise<boolean> {
   try {
     const success = await deleteSecureValue(API_KEY_SECURE_KEY);
@@ -144,16 +132,10 @@ export async function clearApiKey(): Promise<boolean> {
   }
 }
 
-/**
- * Get current API key (from cache)
- */
 export function getApiKey(): string {
   return apiKeyCache.value;
 }
 
-/**
- * Check if API key has been loaded
- */
 export function isApiKeyReady(): boolean {
   return isApiKeyLoaded.value;
 }
@@ -190,9 +172,6 @@ export function isConfigured(): boolean {
   return !!apiKeyCache.value;
 }
 
-/**
- * Initialize the config store (call on app start)
- */
 export async function initializeConfig(): Promise<void> {
   await loadApiKey();
 }

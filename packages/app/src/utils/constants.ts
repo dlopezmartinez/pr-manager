@@ -1,7 +1,3 @@
-/**
- * Application-wide constants
- */
-
 export const DEFAULT_POLLING_INTERVAL_MS = 5 * 60 * 1000;
 export const MIN_POLLING_INTERVAL_MS = 60 * 1000;
 export const MAX_POLLING_INTERVAL_MS = 60 * 60 * 1000;

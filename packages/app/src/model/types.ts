@@ -1,4 +1,3 @@
-// Tipos base para las respuestas de GitHub
 export interface Author {
   login: string;
   avatarUrl: string;
@@ -8,9 +7,6 @@ export interface Repository {
   nameWithOwner: string;
 }
 
-/**
- * Extended repository info for repository selector
- */
 export interface RepositoryInfo {
   nameWithOwner: string;
   name: string;
@@ -28,9 +24,6 @@ export interface Label {
   color: string;
 }
 
-// ===== Modelos para PRs =====
-
-// Estado de review del usuario actual sobre una PR
 export type MyReviewStatus = 'author' | 'pending' | 'reviewed' | 'none';
 
 export interface PullRequestBasic {
@@ -44,14 +37,11 @@ export interface PullRequestBasic {
   author: Author;
   createdAt: string;
   updatedAt: string;
-  // Diff stats for tooltips
   additions?: number;
   deletions?: number;
   changedFiles?: number;
-  // Branch info for tooltips
   headRefName?: string;
   baseRefName?: string;
-  // Estado de review del usuario actual (calculado en ViewAdapter)
   myReviewStatus?: MyReviewStatus;
   comments?: {
     totalCount: number;
@@ -110,8 +100,6 @@ export interface PullRequest extends PullRequestBasic {
   };
 }
 
-// ===== Modelos para Reviews =====
-
 export interface ReviewComment {
   id: string;
   body: string;
@@ -132,8 +120,6 @@ export interface Review {
   };
 }
 
-// ===== Modelos para Comments =====
-
 export interface Comment {
   id: string;
   author: Author;
@@ -141,8 +127,6 @@ export interface Comment {
   createdAt: string;
   updatedAt: string;
 }
-
-// ===== Modelos para CI/CD Checks =====
 
 export interface CheckRun {
   __typename: 'CheckRun';
@@ -179,8 +163,6 @@ export interface Commit {
     statusCheckRollup: StatusCheckRollup | null;
   };
 }
-
-// ===== Respuestas de la API =====
 
 export interface PageInfo {
   hasNextPage: boolean;

@@ -67,7 +67,6 @@ function handleClick(notification: ToastNotification) {
   dismiss(notification.id);
 }
 
-// Listen for fallback notifications from main process
 onMounted(() => {
   onIpcEvent('notification-fallback', (options: unknown) => {
     const opts = options as { title: string; body: string; subtitle?: string; url?: string };
@@ -79,7 +78,6 @@ onUnmounted(() => {
   removeIpcListener('notification-fallback');
 });
 
-// Expose method to show notifications programmatically
 defineExpose({
   show: addNotification,
 });
@@ -173,7 +171,6 @@ defineExpose({
   color: var(--color-text-primary);
 }
 
-/* Transition animations */
 .toast-enter-active {
   transition: all 0.3s ease;
 }

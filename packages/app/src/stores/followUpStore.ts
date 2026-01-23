@@ -1,15 +1,6 @@
-/**
- * Follow-up Store
- * Tracks which PRs the user is following for change notifications
- * Persists to localStorage with automatic pruning
- */
-
 import { reactive, watch, computed } from 'vue';
 import type { PullRequestBasic } from '../model/types';
 
-/**
- * State tracked for each followed PR to detect changes
- */
 export interface FollowedPRState {
   commitCount: number;
   commentCount: number;
@@ -17,9 +8,6 @@ export interface FollowedPRState {
   updatedAt: string;
 }
 
-/**
- * Information stored for a followed PR
- */
 export interface FollowedPRInfo {
   prId: string;
   prNumber: number;
@@ -28,7 +16,7 @@ export interface FollowedPRInfo {
   title: string;
   authorLogin: string;
   authorAvatarUrl: string;
-  followedAt: string; // ISO timestamp
+  followedAt: string;
   lastKnownState: FollowedPRState;
 }
 
@@ -38,7 +26,7 @@ interface FollowUpStoreData {
 }
 
 const STORAGE_KEY = 'pr-manager-follow-up';
-const MAX_FOLLOWED_PRS = 50; // Limit to prevent API rate limiting
+const MAX_FOLLOWED_PRS = 50;
 const PRUNE_AGE_DAYS = 30;
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -97,9 +85,6 @@ function pruneOldEntries(data: FollowUpStoreData): void {
   data.lastPruned = now.toISOString();
 }
 
-/**
- * Extract the state we track for changes from a PR
- */
 function extractPRState(pr: PullRequestBasic): FollowedPRState {
   const regularComments = pr.comments?.totalCount ?? 0;
   const reviewComments = pr.reviews?.nodes?.reduce(
@@ -107,7 +92,6 @@ function extractPRState(pr: PullRequestBasic): FollowedPRState {
     0
   ) ?? 0;
 
-  // Use totalCount for commits if available, otherwise count nodes
   const commitCount = pr.commits?.totalCount ?? pr.commits?.nodes?.length ?? 0;
 
   return {
@@ -118,10 +102,8 @@ function extractPRState(pr: PullRequestBasic): FollowedPRState {
   };
 }
 
-// Initialize store
 const storeData = reactive<FollowUpStoreData>(loadFollowUpState());
 
-// Prune on startup if needed (once per day)
 const lastPruned = new Date(storeData.lastPruned);
 const now = new Date();
 if (now.getTime() - lastPruned.getTime() > 24 * 60 * 60 * 1000) {
@@ -129,7 +111,6 @@ if (now.getTime() - lastPruned.getTime() > 24 * 60 * 60 * 1000) {
   saveFollowUpState(storeData);
 }
 
-// Auto-save on changes
 watch(
   () => ({ ...storeData }),
   (newData) => {
@@ -138,13 +119,7 @@ watch(
   { deep: true }
 );
 
-// ===== Public API =====
-
-/**
- * Follow a PR for change notifications
- */
 export function followPR(pr: PullRequestBasic): boolean {
-  // Check limit
   if (Object.keys(storeData.followedPRs).length >= MAX_FOLLOWED_PRS) {
     console.warn(`Cannot follow more than ${MAX_FOLLOWED_PRS} PRs`);
     return false;
@@ -165,63 +140,38 @@ export function followPR(pr: PullRequestBasic): boolean {
   return true;
 }
 
-/**
- * Stop following a PR
- */
 export function unfollowPR(prId: string): void {
   delete storeData.followedPRs[prId];
 }
 
-/**
- * Check if a PR is being followed
- */
 export function isFollowing(prId: string): boolean {
   return prId in storeData.followedPRs;
 }
 
-/**
- * Get info about a followed PR
- */
 export function getFollowedPRInfo(prId: string): FollowedPRInfo | undefined {
   return storeData.followedPRs[prId];
 }
 
-/**
- * Get all followed PRs
- */
 export function getFollowedPRs(): FollowedPRInfo[] {
   return Object.values(storeData.followedPRs);
 }
 
-/**
- * Get followed PR IDs for batch fetching
- */
 export function getFollowedPRIds(): string[] {
   return Object.keys(storeData.followedPRs);
 }
 
-/**
- * Get count of followed PRs
- */
 export function getFollowedCount(): number {
   return Object.keys(storeData.followedPRs).length;
 }
 
-/**
- * Update the last known state for a PR (called after polling)
- */
 export function updatePRState(prId: string, pr: PullRequestBasic): void {
   const info = storeData.followedPRs[prId];
   if (info) {
     info.lastKnownState = extractPRState(pr);
-    info.title = pr.title; // Update title in case it changed
+    info.title = pr.title;
   }
 }
 
-/**
- * Compare current PR state with last known state
- * Returns changes detected
- */
 export function detectChanges(
   prId: string,
   currentPR: PullRequestBasic
@@ -259,37 +209,21 @@ export function detectChanges(
   };
 }
 
-/**
- * Remove a PR from follow-up (e.g., when PR is closed/merged)
- */
 export function removeClosedPR(prId: string): void {
   delete storeData.followedPRs[prId];
 }
 
-/**
- * Clear all followed PRs
- */
 export function clearAllFollowed(): void {
   storeData.followedPRs = {};
   storeData.lastPruned = new Date().toISOString();
 }
 
-/**
- * Check if we can follow more PRs
- */
 export function canFollowMore(): boolean {
   return Object.keys(storeData.followedPRs).length < MAX_FOLLOWED_PRS;
 }
 
-/**
- * Computed: reactive count of followed PRs
- */
 export const followedCount = computed(() => Object.keys(storeData.followedPRs).length);
 
-/**
- * Computed: reactive list of followed PRs
- */
 export const followedPRsList = computed(() => Object.values(storeData.followedPRs));
 
-// Export store for direct access if needed
 export const followUpStore = storeData;

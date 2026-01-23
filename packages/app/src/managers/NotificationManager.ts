@@ -23,15 +23,6 @@ export interface NotificationConfig {
   notifyOnNewComments: boolean;
 }
 
-/**
- * NotificationManager - Manages native OS notifications
- * 
- * Works asynchronously comparing states between polling cycles
- * to detect changes and show relevant notifications.
- * 
- * Single Responsibility: Only handles notification logic, delegates
- * actual notification sending to electron utils.
- */
 export class NotificationManager {
   private previousState: NotificationState | null = null;
   private config: NotificationConfig = {
@@ -39,7 +30,7 @@ export class NotificationManager {
     notifyOnNewPR: true,
     notifyOnNewComments: true,
   };
-  
+
   private readonly isElectronEnv: boolean;
 
   constructor() {
@@ -49,17 +40,10 @@ export class NotificationManager {
     }
   }
 
-  /**
-   * Actualiza la configuración de notificaciones
-   */
   updateConfig(config: Partial<NotificationConfig>): void {
     this.config = { ...this.config, ...config };
   }
 
-  /**
-   * Procesa los nuevos datos de PRs y detecta cambios
-   * Este método es llamado después de cada polling cycle
-   */
   async processUpdate(prs: PullRequestBasic[]): Promise<void> {
     const currentState = this.buildState(prs);
 
@@ -84,9 +68,6 @@ export class NotificationManager {
     this.previousState = currentState;
   }
 
-  /**
-   * Construye el estado actual basado en los PRs
-   */
   private buildState(prs: PullRequestBasic[]): NotificationState {
     const prIds = new Set<string>();
     const commentCounts = new Map<string, number>();
@@ -97,11 +78,11 @@ export class NotificationManager {
 
       const regularComments = pr.comments?.totalCount ?? 0;
       const reviewComments = pr.reviews?.nodes?.reduce(
-        (sum, review) => sum + (review.comments?.totalCount ?? 0), 
+        (sum, review) => sum + (review.comments?.totalCount ?? 0),
         0
       ) ?? 0;
       const total = regularComments + reviewComments;
-      
+
       commentCounts.set(pr.id, total);
       totalComments += total;
     }
@@ -114,9 +95,6 @@ export class NotificationManager {
     };
   }
 
-  /**
-   * Detecta cambios entre el estado anterior y el actual
-   */
   private detectChanges(
     prs: PullRequestBasic[],
     previous: NotificationState,
@@ -133,7 +111,7 @@ export class NotificationManager {
 
       const previousCount = previous.commentCounts.get(pr.id) ?? 0;
       const currentCount = current.commentCounts.get(pr.id) ?? 0;
-      
+
       if (currentCount > previousCount) {
         prsWithNewComments.push({
           pr,
@@ -145,9 +123,6 @@ export class NotificationManager {
     return { newPRs, prsWithNewComments };
   }
 
-  /**
-   * Muestra notificaciones nativas del SO para los cambios detectados
-   */
   private async showNotifications(changes: NotificationChanges): Promise<void> {
     const { newPRs, prsWithNewComments } = changes;
 
@@ -160,9 +135,6 @@ export class NotificationManager {
     }
   }
 
-  /**
-   * Muestra notificación para nuevos PRs
-   */
   private async showNewPRsNotification(newPRs: PullRequestBasic[]): Promise<void> {
     if (newPRs.length === 1) {
       const pr = newPRs[0];
@@ -181,14 +153,11 @@ export class NotificationManager {
     }
   }
 
-  /**
-   * Muestra notificación para nuevos comentarios
-   */
   private async showNewCommentsNotification(
     prsWithNewComments: NotificationChanges['prsWithNewComments']
   ): Promise<void> {
     const totalNewComments = prsWithNewComments.reduce(
-      (sum, item) => sum + item.newCommentsCount, 
+      (sum, item) => sum + item.newCommentsCount,
       0
     );
 
@@ -211,9 +180,6 @@ export class NotificationManager {
     }
   }
 
-  /**
-   * Sends a native OS notification via Electron
-   */
   private async sendNotification(options: {
     title: string;
     body: string;
@@ -229,9 +195,6 @@ export class NotificationManager {
     showNotification(options);
   }
 
-  /**
-   * Fallback: usa Web Notification API si no estamos en Electron
-   */
   private showWebNotification(options: {
     title: string;
     body: string;
@@ -242,7 +205,7 @@ export class NotificationManager {
     if (Notification.permission === 'granted') {
       const notification = new Notification(options.title, {
         body: options.body,
-        icon: '/icon.png', // App icon
+        icon: '/icon.png',
       });
 
       if (options.url) {
@@ -255,16 +218,10 @@ export class NotificationManager {
     }
   }
 
-  /**
-   * Resetea el estado (útil cuando el usuario hace logout)
-   */
   reset(): void {
     this.previousState = null;
   }
 
-  /**
-   * Obtiene el estado actual para debugging
-   */
   getState(): NotificationState | null {
     return this.previousState;
   }

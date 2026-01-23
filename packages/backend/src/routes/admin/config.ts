@@ -9,10 +9,6 @@ import { getQueryString, toStr } from '../../utils/queryParams.js';
 
 const router = Router();
 
-/**
- * GET /admin/config
- * Get all system configuration
- */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const configs = await prisma.systemConfig.findMany({
@@ -32,10 +28,6 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /admin/config/:key
- * Get specific configuration value
- */
 router.get('/:key', async (req: Request, res: Response) => {
   try {
     const config = await prisma.systemConfig.findUnique({
@@ -60,15 +52,11 @@ router.get('/:key', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /admin/config
- * Create or update configuration (SUPERUSER only)
- */
 router.post('/', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
       key: z.string().min(1).max(255),
-      value: z.any(), // Accept any JSON value
+      value: z.any(),
     });
 
     const validation = schema.safeParse(req.body);
@@ -133,10 +121,6 @@ router.post('/', requireSuperuser, async (req: Request, res: Response) => {
   }
 });
 
-/**
- * DELETE /admin/config/:key
- * Delete configuration (SUPERUSER only)
- */
 router.delete('/:key', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const config = await prisma.systemConfig.findUnique({

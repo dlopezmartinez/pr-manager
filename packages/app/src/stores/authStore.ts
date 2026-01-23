@@ -1,21 +1,8 @@
-/**
- * Authentication Store
- * Reactive state management for auth and subscription status
- * Handles:
- * - User authentication state
- * - Subscription status
- * - User suspension detection
- * - Session revocation handling
- */
-
 import { reactive, computed, readonly } from 'vue';
 import { authService, type SubscriptionStatus } from '../services/authService';
 import { onAuthError, type AuthErrorEvent } from '../services/http';
 import { AUTH_ERROR_CODES, isUserSuspended } from '../types/errors';
 import type { AuthUser } from '../preload';
-
-// Check if auth should be skipped (for development/beta testing)
-const SKIP_AUTH = import.meta.env.VITE_SKIP_AUTH === 'true';
 
 interface AuthState {
   initialized: boolean;
@@ -24,10 +11,8 @@ interface AuthState {
   subscription: SubscriptionStatus | null;
   isLoading: boolean;
   error: string | null;
-  // Suspension state
   isSuspended: boolean;
   suspensionReason: string | null;
-  // Session state
   sessionRevoked: boolean;
 }
 
@@ -43,7 +28,6 @@ const state = reactive<AuthState>({
   sessionRevoked: false,
 });
 
-// Computed properties
 const isActive = computed(() => {
   return state.subscription?.active ?? false;
 });
@@ -61,19 +45,13 @@ const subscriptionStatus = computed(() => {
 });
 
 const canUseApp = computed(() => {
-  // User can use the app if they have an active subscription or are in trial
   return state.isAuthenticated && (state.subscription?.active ?? false);
 });
 
 const needsSubscription = computed(() => {
-  // User is authenticated but doesn't have an active subscription
   return state.isAuthenticated && !state.subscription?.active;
 });
 
-/**
- * Handle auth error events from HTTP interceptor
- * Centralizes handling of suspension and session revocation
- */
 function handleAuthError(event: AuthErrorEvent): void {
   console.warn('[Auth] Received auth error event:', event.code);
 
@@ -86,48 +64,28 @@ function handleAuthError(event: AuthErrorEvent): void {
   }
 }
 
-// Subscribe to auth error events from HTTP interceptor
 let authErrorUnsubscribe: (() => void) | null = null;
 
-/**
- * Initialize the auth store
- * Should be called once on app startup
- */
 async function initialize(): Promise<void> {
   if (state.initialized) return;
 
   state.isLoading = true;
   state.error = null;
 
-  // Subscribe to auth error events (only once)
   if (!authErrorUnsubscribe) {
     authErrorUnsubscribe = onAuthError(handleAuthError);
   }
 
-  // Skip auth for development/beta testing
-  if (SKIP_AUTH) {
-    console.log('[Auth] Skipping authentication (VITE_SKIP_AUTH=true)');
-    state.isAuthenticated = true;
-    state.user = { id: 'dev-user', email: 'dev@prmanager.app', name: 'Developer' };
-    state.subscription = { active: true, status: 'active', isTrialing: false };
-    state.initialized = true;
-    state.isLoading = false;
-    return;
-  }
-
   try {
-    // Initialize auth service (loads stored token)
     const hasToken = await authService.initialize();
 
     if (hasToken) {
-      // Verify the token is still valid
       const verification = await authService.verifyToken();
 
       if (verification.valid && verification.user) {
         state.isAuthenticated = true;
         state.user = verification.user;
 
-        // Check subscription status
         await refreshSubscription();
       } else {
         state.isAuthenticated = false;
@@ -151,9 +109,6 @@ async function initialize(): Promise<void> {
   }
 }
 
-/**
- * Sign up a new user
- */
 async function signup(email: string, password: string, name?: string): Promise<void> {
   state.isLoading = true;
   state.error = null;
@@ -163,7 +118,6 @@ async function signup(email: string, password: string, name?: string): Promise<v
     state.isAuthenticated = true;
     state.user = response.user;
 
-    // New users start with no subscription (will get trial on first checkout)
     state.subscription = { active: false, status: 'none' };
   } catch (error) {
     state.error = error instanceof Error ? error.message : 'Signup failed';
@@ -173,9 +127,6 @@ async function signup(email: string, password: string, name?: string): Promise<v
   }
 }
 
-/**
- * Log in an existing user
- */
 async function login(email: string, password: string): Promise<void> {
   state.isLoading = true;
   state.error = null;
@@ -185,7 +136,6 @@ async function login(email: string, password: string): Promise<void> {
     state.isAuthenticated = true;
     state.user = response.user;
 
-    // Check subscription status
     await refreshSubscription();
   } catch (error) {
     state.error = error instanceof Error ? error.message : 'Login failed';
@@ -195,9 +145,6 @@ async function login(email: string, password: string): Promise<void> {
   }
 }
 
-/**
- * Log out the current user
- */
 async function logout(): Promise<void> {
   state.isLoading = true;
   state.error = null;
@@ -217,14 +164,9 @@ async function logout(): Promise<void> {
   }
 }
 
-/**
- * Handle expired/invalid token
- * Called by health polling when token is no longer valid
- */
 async function handleExpiredToken(): Promise<void> {
   console.warn('[Auth] Token expired or invalid, forcing logout');
 
-  // Clear auth data
   state.isAuthenticated = false;
   state.user = null;
   state.subscription = null;
@@ -232,7 +174,6 @@ async function handleExpiredToken(): Promise<void> {
   state.suspensionReason = null;
   state.sessionRevoked = false;
 
-  // Show native notification to user
   try {
     if (window.electronAPI?.ipc) {
       window.electronAPI.ipc.send('show-notification', {
@@ -244,25 +185,18 @@ async function handleExpiredToken(): Promise<void> {
     console.error('Failed to show expiration notification:', error);
   }
 
-  // Clear tokens from storage
   await authService.logout();
 }
 
-/**
- * Handle user suspension
- * Called when backend returns USER_SUSPENDED error
- */
 async function handleUserSuspended(reason: string): Promise<void> {
   console.warn('[Auth] User suspended:', reason);
 
-  // Set suspension state
   state.isSuspended = true;
   state.suspensionReason = reason;
   state.isAuthenticated = false;
   state.user = null;
   state.subscription = null;
 
-  // Show native notification
   try {
     if (window.electronAPI?.ipc) {
       window.electronAPI.ipc.send('show-notification', {
@@ -274,24 +208,17 @@ async function handleUserSuspended(reason: string): Promise<void> {
     console.error('Failed to show suspension notification:', error);
   }
 
-  // Clear tokens from storage
   await authService.logout();
 }
 
-/**
- * Handle session revocation
- * Called when backend returns SESSION_REVOKED error
- */
 async function handleSessionRevoked(): Promise<void> {
   console.warn('[Auth] Session revoked by administrator');
 
-  // Set session revoked state
   state.sessionRevoked = true;
   state.isAuthenticated = false;
   state.user = null;
   state.subscription = null;
 
-  // Show native notification
   try {
     if (window.electronAPI?.ipc) {
       window.electronAPI.ipc.send('show-notification', {
@@ -303,28 +230,18 @@ async function handleSessionRevoked(): Promise<void> {
     console.error('Failed to show session revoked notification:', error);
   }
 
-  // Clear tokens from storage
   await authService.logout();
 }
 
-/**
- * Clear suspension state (for retry after suspension lifted)
- */
 function clearSuspension(): void {
   state.isSuspended = false;
   state.suspensionReason = null;
 }
 
-/**
- * Clear session revoked state (for retry after re-login)
- */
 function clearSessionRevoked(): void {
   state.sessionRevoked = false;
 }
 
-/**
- * Refresh subscription status from the backend
- */
 async function refreshSubscription(): Promise<void> {
   if (!state.isAuthenticated) return;
 
@@ -336,9 +253,6 @@ async function refreshSubscription(): Promise<void> {
   }
 }
 
-/**
- * Open checkout for subscription
- */
 async function openCheckout(priceId: 'monthly' | 'yearly'): Promise<void> {
   state.isLoading = true;
   state.error = null;
@@ -356,9 +270,6 @@ async function openCheckout(priceId: 'monthly' | 'yearly'): Promise<void> {
   }
 }
 
-/**
- * Open customer portal for subscription management
- */
 async function openCustomerPortal(): Promise<void> {
   state.isLoading = true;
   state.error = null;
@@ -376,19 +287,13 @@ async function openCustomerPortal(): Promise<void> {
   }
 }
 
-/**
- * Clear any error message
- */
 function clearError(): void {
   state.error = null;
 }
 
-// Export the store
 export const authStore = {
-  // State (readonly to prevent direct mutations)
   state: readonly(state),
 
-  // Computed
   isActive,
   isTrialing,
   trialDaysLeft,
@@ -396,7 +301,6 @@ export const authStore = {
   canUseApp,
   needsSubscription,
 
-  // Actions
   initialize,
   signup,
   login,

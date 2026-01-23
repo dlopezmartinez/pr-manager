@@ -1,6 +1,5 @@
 <template>
   <div class="notification-inbox">
-    <!-- Empty state (no unread notifications) -->
     <div v-if="!hasUnreadNotifications" class="empty-state">
       <div class="empty-icon">
         <Bell :size="48" :stroke-width="1.5" />
@@ -23,9 +22,7 @@
       </div>
     </div>
 
-    <!-- Notifications list -->
     <div v-else class="notifications-container">
-      <!-- Header with actions -->
       <div class="notifications-header">
         <span class="notifications-count">
           {{ unreadCount }} notification{{ unreadCount !== 1 ? 's' : '' }}
@@ -42,7 +39,6 @@
         </div>
       </div>
 
-      <!-- Notification items (unread only) -->
       <div class="notifications-list">
         <NotificationItem
           v-for="notification in unreadNotifications"
@@ -71,23 +67,19 @@ import {
 import { followedCount } from '../stores/followUpStore';
 import { openExternal } from '../utils/electron';
 
-// Use reactive computed from store (not a function call)
 const unreadNotifications = unreadNotificationsList;
 const hasUnreadNotifications = hasUnread;
 
 function handleNotificationClick(notification: InboxNotification) {
-  // Mark as read (dismisses from list) and open the PR
   markAsRead(notification.id);
   openExternal(notification.url).catch(console.error);
 }
 
 function handleDismiss(notificationId: string) {
-  // Mark as read to dismiss from list
   markAsRead(notificationId);
 }
 
 function handleDismissAll() {
-  // Mark all as read to dismiss all
   markAllAsRead();
 }
 </script>
@@ -101,7 +93,6 @@ function handleDismissAll() {
   padding: var(--spacing-md);
 }
 
-/* Empty state */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -183,7 +174,6 @@ function handleDismissAll() {
   color: var(--color-accent-primary);
 }
 
-/* Notifications container */
 .notifications-container {
   display: flex;
   flex-direction: column;

@@ -1,33 +1,17 @@
-/**
- * Secure Storage Module
- * Uses Electron's safeStorage API to encrypt sensitive data
- *
- * Data is encrypted using OS-level encryption:
- * - macOS: Keychain
- * - Windows: DPAPI
- * - Linux: libsecret or kwallet
- */
-
 import { safeStorage, app } from 'electron';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 interface SecureData {
-  [key: string]: string; // encrypted base64 strings
+  [key: string]: string;
 }
 
 const SECURE_FILE_NAME = 'secure-storage.json';
 
-/**
- * Get the path to the secure storage file
- */
 function getStoragePath(): string {
   return path.join(app.getPath('userData'), SECURE_FILE_NAME);
 }
 
-/**
- * Load encrypted data from disk
- */
 function loadSecureData(): SecureData {
   try {
     const filePath = getStoragePath();
@@ -41,9 +25,6 @@ function loadSecureData(): SecureData {
   return {};
 }
 
-/**
- * Save encrypted data to disk
- */
 function saveSecureData(data: SecureData): void {
   try {
     const filePath = getStoragePath();
@@ -53,16 +34,10 @@ function saveSecureData(data: SecureData): void {
   }
 }
 
-/**
- * Check if encryption is available on this system
- */
 export function isEncryptionAvailable(): boolean {
   return safeStorage.isEncryptionAvailable();
 }
 
-/**
- * Store a value securely (encrypted)
- */
 export function setSecureValue(key: string, value: string): boolean {
   if (!safeStorage.isEncryptionAvailable()) {
     console.error('Encryption not available - cannot store sensitive data securely');
@@ -81,9 +56,6 @@ export function setSecureValue(key: string, value: string): boolean {
   }
 }
 
-/**
- * Retrieve a securely stored value (decrypted)
- */
 export function getSecureValue(key: string): string | null {
   const data = loadSecureData();
   const encryptedBase64 = data[key];
@@ -106,9 +78,6 @@ export function getSecureValue(key: string): string | null {
   }
 }
 
-/**
- * Delete a securely stored value
- */
 export function deleteSecureValue(key: string): boolean {
   try {
     const data = loadSecureData();
@@ -124,9 +93,6 @@ export function deleteSecureValue(key: string): boolean {
   }
 }
 
-/**
- * Clear all secure storage
- */
 export function clearSecureStorage(): boolean {
   try {
     const filePath = getStoragePath();

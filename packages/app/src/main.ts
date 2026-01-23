@@ -1,7 +1,7 @@
-/**
- * Electron Main Process
- * Entry point for the PR Manager menubar application
- */
+import { initSentryMain } from './lib/sentry';
+initSentryMain();
+
+import { initAutoUpdater } from './lib/autoUpdater';
 
 import { app, BrowserWindow, Tray, screen, Menu, ipcMain, shell, Notification } from 'electron';
 import path from 'node:path';
@@ -27,7 +27,6 @@ import {
 } from './utils/secureStorage';
 import { validateToken, TokenValidationResult } from './utils/tokenValidation';
 
-// Auth token storage keys
 const AUTH_TOKEN_KEY = 'pr-manager-auth-token';
 const AUTH_REFRESH_TOKEN_KEY = 'pr-manager-auth-refresh-token';
 const AUTH_USER_KEY = 'pr-manager-auth-user';
@@ -44,7 +43,6 @@ let syncingFrames: Electron.NativeImage[] = [];
 let syncingAnimationInterval: ReturnType<typeof setInterval> | null = null;
 let currentSyncingFrame = 0;
 
-// Window bounds persistence
 interface WindowBounds {
   x?: number;
   y?: number;
@@ -78,29 +76,18 @@ function saveWindowBounds(bounds: WindowBounds): void {
   }
 }
 
-/**
- * Check if the main window is available and not destroyed
- */
 function isWindowAvailable(): boolean {
   return mainWindow !== null && !mainWindow.isDestroyed();
 }
 
-/**
- * Check if the tray is available and not destroyed
- */
 function isTrayAvailable(): boolean {
   return tray !== null && !tray.isDestroyed();
 }
 
-/**
- * Create the main application window
- * Opens centered on screen with saved size (or defaults)
- */
 function createWindow(): void {
   const windowConfig = getWindowConfig();
   const savedBounds = loadWindowBounds();
 
-  // Use saved dimensions or defaults
   const width = savedBounds?.width || WINDOW_WIDTH;
   const height = savedBounds?.height || WINDOW_HEIGHT;
 
@@ -123,11 +110,10 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      backgroundThrottling: false, // Keep timers running when window is hidden (for polling)
+      backgroundThrottling: false,
     },
   });
 
-  // Save window bounds on resize and move
   mainWindow.on('resized', () => {
     if (isWindowAvailable()) {
       const bounds = mainWindow!.getBounds();
@@ -155,22 +141,17 @@ function createWindow(): void {
     if (!isQuitting) {
       event.preventDefault();
       mainWindow?.hide();
-      // Hide dock icon on macOS when window is hidden (menubar-only app)
       if (process.platform === 'darwin') {
         app.dock?.hide();
       }
     }
   });
 
-  // Show window centered on startup
   mainWindow.once('ready-to-show', () => {
     showWindowCentered();
   });
 }
 
-/**
- * Toggle window visibility
- */
 function toggleWindow(): void {
   if (!isWindowAvailable()) return;
 
@@ -181,13 +162,9 @@ function toggleWindow(): void {
   }
 }
 
-/**
- * Show window centered on screen with focus
- */
 function showWindowCentered(): void {
   if (!isWindowAvailable()) return;
 
-  // Center the window on the primary display
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
   const windowBounds = mainWindow!.getBounds();
@@ -199,14 +176,10 @@ function showWindowCentered(): void {
   mainWindow!.show();
   mainWindow!.focus();
 
-  // Bring window to front without showing in dock (menubar-only app)
   mainWindow!.setAlwaysOnTop(true);
   mainWindow!.setAlwaysOnTop(false);
 }
 
-/**
- * Create the system tray icon and context menu
- */
 function createTray(): void {
   normalIcon = createTrayIcon();
   syncingFrames = createSyncingIconFrames(12);
@@ -229,9 +202,6 @@ function createTray(): void {
   });
 }
 
-/**
- * Setup IPC handlers for renderer process communication
- */
 function setupIpcHandlers(): void {
   ipcMain.on('update-pr-count', (_, count: number) => {
     if (isTrayAvailable()) {
@@ -268,7 +238,6 @@ function setupIpcHandlers(): void {
     return validateToken(provider, token, baseUrl);
   });
 
-  // Auth token handlers (for PR Manager account, not Git provider tokens)
   ipcMain.handle('auth:get-token', async () => {
     return getSecureValue(AUTH_TOKEN_KEY);
   });
@@ -349,10 +318,8 @@ function setupIpcHandlers(): void {
   }) => {
     const notifConfig = getNotificationConfig();
 
-    // Check if notifications are supported
     if (!Notification.isSupported()) {
       console.warn('Native notifications not supported on this platform');
-      // Send fallback signal to renderer for in-app notification
       if (isWindowAvailable()) {
         mainWindow!.webContents.send('notification-fallback', options);
       }
@@ -377,7 +344,6 @@ function setupIpcHandlers(): void {
           ? path.join(process.resourcesPath, 'icon.png')
           : path.join(__dirname, '../../assets/icon.png');
 
-        // Only set icon if file exists
         if (fs.existsSync(iconPath)) {
           notificationOptions.icon = iconPath;
         } else {
@@ -391,13 +357,11 @@ function setupIpcHandlers(): void {
         if (options.url) {
           shell.openExternal(options.url);
         }
-        // Also show the app window when notification is clicked
         showWindowCentered();
       });
 
       notification.on('failed', (_, error) => {
         console.error('Notification failed:', error);
-        // Send fallback signal to renderer for in-app notification
         if (isWindowAvailable()) {
           mainWindow!.webContents.send('notification-fallback', options);
         }
@@ -406,7 +370,6 @@ function setupIpcHandlers(): void {
       notification.show();
     } catch (error) {
       console.error('Error showing notification:', error);
-      // Send fallback signal to renderer for in-app notification
       if (isWindowAvailable()) {
         mainWindow!.webContents.send('notification-fallback', options);
       }
@@ -438,9 +401,6 @@ function setupIpcHandlers(): void {
   });
 }
 
-/**
- * Cleanup all resources before quitting
- */
 function cleanup(): void {
   if (syncingAnimationInterval) {
     clearInterval(syncingAnimationInterval);
@@ -471,7 +431,6 @@ function cleanup(): void {
 }
 
 app.on('ready', () => {
-  // Hide dock icon on macOS (menubar-only app)
   if (process.platform === 'darwin') {
     app.dock?.hide();
   }
@@ -479,6 +438,8 @@ app.on('ready', () => {
   createWindow();
   createTray();
   setupIpcHandlers();
+
+  initAutoUpdater(mainWindow);
 });
 
 app.on('before-quit', () => {
@@ -497,13 +458,10 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  // macOS only: Re-open window when clicking on dock icon
-  // This event doesn't fire on Windows/Linux
   if (process.platform === 'darwin') {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     } else if (isWindowAvailable()) {
-      // Window exists but may be hidden - show it
       showWindowCentered();
     }
   }

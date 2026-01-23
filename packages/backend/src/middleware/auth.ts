@@ -18,10 +18,6 @@ declare global {
   }
 }
 
-/**
- * Error codes for authentication failures
- * These codes are used by the app to determine the appropriate action
- */
 export const AUTH_ERROR_CODES = {
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   TOKEN_INVALID: 'TOKEN_INVALID',
@@ -30,10 +26,6 @@ export const AUTH_ERROR_CODES = {
   REFRESH_TOKEN_INVALID: 'REFRESH_TOKEN_INVALID',
 } as const;
 
-/**
- * Authentication middleware - verify access token
- * Also checks if user is suspended
- */
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
 
@@ -53,7 +45,6 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET) as JWTPayload;
 
-    // Check if user is suspended
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       select: { isSuspended: true, suspendedReason: true },
@@ -89,10 +80,6 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   }
 }
 
-/**
- * Generate Access Token (JWT, short-lived)
- * Validity: 15 minutes
- */
 export function generateAccessToken(payload: {
   userId: string;
   email: string;
@@ -103,37 +90,25 @@ export function generateAccessToken(payload: {
   }
 
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: '15m', // 15 minutes - short lived
+    expiresIn: '15m',
   });
 }
 
-/**
- * Generate Refresh Token (random string, long-lived)
- * Saved to database for verification and revocation
- * Returns unhashed token to send to client
- */
 export async function generateRefreshToken(userId: string): Promise<string> {
-  // Generate random 256-bit token (32 bytes = 256 bits)
   const token = randomBytes(32).toString('hex');
-
-  // Hash token before storing (never store plaintext)
   const tokenHash = createHash('sha256').update(token).digest('hex');
 
-  // Save to database
   await prisma.session.create({
     data: {
       userId,
       token: tokenHash,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     },
   });
 
-  return token; // Return unhashed for client
+  return token;
 }
 
-/**
- * Generate both Access and Refresh tokens (convenience function)
- */
 export async function generateTokens(payload: {
   userId: string;
   email: string;
@@ -145,13 +120,10 @@ export async function generateTokens(payload: {
   return {
     accessToken,
     refreshToken,
-    expiresIn: 15 * 60, // seconds (15 minutes)
+    expiresIn: 15 * 60,
   };
 }
 
-/**
- * Result of refresh token verification
- */
 export interface RefreshTokenResult {
   valid: boolean;
   userId?: string;
@@ -159,20 +131,14 @@ export interface RefreshTokenResult {
   errorMessage?: string;
 }
 
-/**
- * Verify Refresh Token and get user ID
- * Returns detailed result with error codes for proper app handling
- */
 export async function verifyRefreshToken(token: string): Promise<RefreshTokenResult> {
   try {
-    // Hash the token to compare with DB
     const tokenHash = createHash('sha256').update(token).digest('hex');
 
-    // Look up in database
     const session = await prisma.session.findFirst({
       where: {
         token: tokenHash,
-        expiresAt: { gt: new Date() }, // Not expired
+        expiresAt: { gt: new Date() },
       },
       include: {
         user: {
@@ -192,7 +158,6 @@ export async function verifyRefreshToken(token: string): Promise<RefreshTokenRes
       };
     }
 
-    // Check if user is suspended
     if (session.user.isSuspended) {
       return {
         valid: false,
@@ -215,10 +180,6 @@ export async function verifyRefreshToken(token: string): Promise<RefreshTokenRes
   }
 }
 
-/**
- * Backwards compatibility - old code may still use generateToken
- * Use generateAccessToken or generateTokens instead
- */
 export function generateToken(payload: {
   userId: string;
   email: string;

@@ -1,6 +1,5 @@
 <template>
   <div class="missing-scopes-container">
-    <!-- Title Bar -->
     <TitleBar>
       <template #left>
         <span class="screen-title">Token Permissions</span>
@@ -9,7 +8,6 @@
 
     <div class="missing-scopes-content">
       <div class="missing-scopes-card">
-        <!-- Header -->
         <div class="card-header">
           <div class="icon-wrapper warning">
             <AlertTriangle :size="32" :stroke-width="2" />
@@ -21,7 +19,6 @@
           </p>
         </div>
 
-        <!-- Missing Scopes List -->
         <div class="scopes-section">
           <h2>Required Permissions</h2>
           <div class="scopes-list">
@@ -41,7 +38,6 @@
           </div>
         </div>
 
-        <!-- Current Scopes (if any) -->
         <div v-if="currentScopes.length > 0" class="scopes-section">
           <h2>Current Permissions</h2>
           <div class="scopes-list">
@@ -61,7 +57,6 @@
           </div>
         </div>
 
-        <!-- Instructions -->
         <div class="instructions-section">
           <h2>How to Fix</h2>
           <ol class="instructions-list">
@@ -92,7 +87,6 @@
           </ol>
         </div>
 
-        <!-- Actions -->
         <div class="actions">
           <button class="btn-secondary" @click="handleChangeToken">
             <Key :size="16" :stroke-width="2" />
@@ -104,7 +98,6 @@
           </button>
         </div>
 
-        <!-- Error message -->
         <div v-if="error" class="error-message">
           <AlertTriangle :size="14" :stroke-width="2" />
           {{ error }}
@@ -271,7 +264,6 @@ h1 {
   line-height: 1.5;
 }
 
-/* Scopes Section */
 .scopes-section {
   margin-bottom: var(--spacing-lg);
 }
@@ -339,7 +331,6 @@ h1 {
   color: var(--color-text-secondary);
 }
 
-/* Instructions Section */
 .instructions-section {
   margin-bottom: var(--spacing-lg);
   padding: var(--spacing-md);
@@ -419,7 +410,6 @@ code {
   font-size: 11px;
 }
 
-/* Actions */
 .actions {
   display: flex;
   gap: var(--spacing-sm);
@@ -476,7 +466,6 @@ code {
   to { transform: rotate(360deg); }
 }
 
-/* Error message */
 .error-message {
   display: flex;
   align-items: center;

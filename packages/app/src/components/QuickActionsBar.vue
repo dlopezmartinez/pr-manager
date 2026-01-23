@@ -65,7 +65,6 @@ defineEmits<{
   pointer-events: none;
 }
 
-/* Show on hover - parent should add .show-actions class or handle via CSS */
 .quick-actions-bar.visible,
 .pr-card:hover .quick-actions-bar {
   opacity: 1;

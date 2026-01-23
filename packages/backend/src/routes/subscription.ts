@@ -16,17 +16,12 @@ import logger from '../lib/logger.js';
 
 const router = Router();
 
-/**
- * GET /subscription/status
- * Get current user's subscription status
- */
 router.get('/status', authenticate, async (req: Request, res: Response) => {
   try {
     const subscription = await prisma.subscription.findUnique({
       where: { userId: req.user!.userId },
     });
 
-    // Special case for SUPERUSER
     if (req.user!.role === UserRole.SUPERUSER) {
       res.json({
         active: true,
@@ -50,10 +45,8 @@ router.get('/status', authenticate, async (req: Request, res: Response) => {
       return;
     }
 
-    // Check if subscription is active
     const isActive = hasActiveSubscription(subscription);
 
-    // Check if trial is still valid
     const isTrialing = subscription.status === 'on_trial';
     const trialDaysLeft = isTrialing && subscription.trialEndsAt
       ? Math.ceil((subscription.trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -75,10 +68,6 @@ router.get('/status', authenticate, async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /subscription/create-checkout
- * Create a LemonSqueezy Checkout session for subscription
- */
 router.post('/create-checkout', authenticate, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
@@ -96,7 +85,6 @@ router.post('/create-checkout', authenticate, async (req: Request, res: Response
 
     const { priceId } = validation.data;
 
-    // Get user
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
       include: { subscription: true },
@@ -107,13 +95,11 @@ router.post('/create-checkout', authenticate, async (req: Request, res: Response
       return;
     }
 
-    // Check if user already has an active subscription
     if (user.subscription && hasActiveSubscription(user.subscription)) {
       res.status(400).json({ error: 'You already have an active subscription' });
       return;
     }
 
-    // Get the variant ID based on price selection
     const variantId = priceId === 'monthly'
       ? LEMONSQUEEZY_CONFIG.VARIANT_MONTHLY
       : LEMONSQUEEZY_CONFIG.VARIANT_YEARLY;
@@ -123,7 +109,6 @@ router.post('/create-checkout', authenticate, async (req: Request, res: Response
       return;
     }
 
-    // Create checkout
     const checkout = await createCheckout(
       variantId,
       user.email,
@@ -141,10 +126,6 @@ router.post('/create-checkout', authenticate, async (req: Request, res: Response
   }
 });
 
-/**
- * POST /subscription/manage
- * Get LemonSqueezy Customer Portal URL for subscription management
- */
 router.post('/manage', authenticate, async (req: Request, res: Response) => {
   try {
     const subscription = await prisma.subscription.findUnique({
@@ -156,7 +137,6 @@ router.post('/manage', authenticate, async (req: Request, res: Response) => {
       return;
     }
 
-    // Get customer portal URL
     const url = await getCustomerPortalUrl(subscription.lemonSqueezySubscriptionId);
 
     res.json({ url });
@@ -166,10 +146,6 @@ router.post('/manage', authenticate, async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /subscription/cancel
- * Cancel subscription at period end
- */
 router.post('/cancel', authenticate, async (req: Request, res: Response) => {
   try {
     const subscription = await prisma.subscription.findUnique({
@@ -181,10 +157,8 @@ router.post('/cancel', authenticate, async (req: Request, res: Response) => {
       return;
     }
 
-    // Cancel via LemonSqueezy
     await lsCancelSubscription(subscription.lemonSqueezySubscriptionId);
 
-    // Update local record
     await prisma.subscription.update({
       where: { id: subscription.id },
       data: { cancelAtPeriodEnd: true },
@@ -201,10 +175,6 @@ router.post('/cancel', authenticate, async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /subscription/reactivate
- * Reactivate a subscription that was set to cancel at period end
- */
 router.post('/reactivate', authenticate, async (req: Request, res: Response) => {
   try {
     const subscription = await prisma.subscription.findUnique({
@@ -221,10 +191,8 @@ router.post('/reactivate', authenticate, async (req: Request, res: Response) => 
       return;
     }
 
-    // Reactivate via LemonSqueezy
     await lsResumeSubscription(subscription.lemonSqueezySubscriptionId);
 
-    // Update local record
     await prisma.subscription.update({
       where: { id: subscription.id },
       data: { cancelAtPeriodEnd: false },
@@ -240,11 +208,6 @@ router.post('/reactivate', authenticate, async (req: Request, res: Response) => 
   }
 });
 
-/**
- * POST /subscription/sync
- * Manually sync subscription status with LemonSqueezy
- * Use this if webhook failed and user's status is wrong
- */
 router.post('/sync', authenticate, subscriptionSyncLimiter, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
@@ -263,7 +226,6 @@ router.post('/sync', authenticate, subscriptionSyncLimiter, async (req: Request,
       return;
     }
 
-    // Call LemonSqueezy API
     const response = await fetch(
       `https://api.lemonsqueezy.com/v1/subscriptions/${subscription.lemonSqueezySubscriptionId}`,
       {
@@ -293,7 +255,6 @@ router.post('/sync', authenticate, subscriptionSyncLimiter, async (req: Request,
     };
     const attrs = data.data.attributes;
 
-    // Update local record
     const updated = await prisma.subscription.update({
       where: { id: subscription.id },
       data: {

@@ -4,15 +4,10 @@ import logger from '../../lib/logger.js';
 
 const router = Router();
 
-/**
- * GET /admin/health
- * Get system health status and metrics
- */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const startTime = Date.now();
 
-    // Check database connectivity
     let dbConnected = false;
     try {
       await prisma.$queryRaw`SELECT 1`;
@@ -21,7 +16,6 @@ router.get('/', async (req: Request, res: Response) => {
       logger.error('Database connection check failed', { error });
     }
 
-    // Get user metrics
     const [totalUsers, activeUsers, suspendedUsers, adminCount, superuserCount] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { isActive: true } }),
@@ -30,7 +24,6 @@ router.get('/', async (req: Request, res: Response) => {
       prisma.user.count({ where: { role: 'SUPERUSER' } }),
     ]);
 
-    // Get session metrics
     const activeSessions = await prisma.session.count({
       where: {
         expiresAt: {
@@ -39,7 +32,6 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
 
-    // Get subscription metrics
     const [activeSubscriptions, trialSubscriptions, cancelledSubscriptions] = await Promise.all([
       prisma.subscription.count({
         where: {
@@ -58,7 +50,6 @@ router.get('/', async (req: Request, res: Response) => {
       }),
     ]);
 
-    // Get webhook metrics
     const [processedWebhooks, pendingWebhooks, failedWebhooks] = await Promise.all([
       prisma.webhookEvent.count({
         where: {
@@ -79,7 +70,6 @@ router.get('/', async (req: Request, res: Response) => {
       }),
     ]);
 
-    // Get audit log metrics
     const auditLogsCount = await prisma.auditLog.count();
 
     const responseTime = Date.now() - startTime;

@@ -1,9 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserRole } from '@prisma/client';
 
-/**
- * Middleware to require SUPERUSER role
- */
 export function requireSuperuser(req: Request, res: Response, next: NextFunction): void {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required' });
@@ -18,9 +15,6 @@ export function requireSuperuser(req: Request, res: Response, next: NextFunction
   next();
 }
 
-/**
- * Middleware to require ADMIN or SUPERUSER role
- */
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (!req.user) {
     res.status(401).json({ error: 'Authentication required' });

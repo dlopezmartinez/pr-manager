@@ -3,16 +3,14 @@ import { UserRole, Subscription } from '@prisma/client';
 export const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'on_trial'] as const;
 
 /**
- * Verifies if a subscription has actually expired based on currentPeriodEnd date
- * Accounts for webhook delays or sync issues
+ * Verifies if a subscription has expired based on currentPeriodEnd date.
+ * Accounts for webhook delays or sync issues.
  */
 function isSubscriptionExpiredByDate(subscription: Subscription): boolean {
-  // Check if currentPeriodEnd has passed
   if (subscription.currentPeriodEnd && subscription.currentPeriodEnd < new Date()) {
     return true;
   }
 
-  // For trial, verify trialEndsAt has not passed
   if (
     subscription.status === 'on_trial' &&
     subscription.trialEndsAt &&
@@ -25,30 +23,26 @@ function isSubscriptionExpiredByDate(subscription: Subscription): boolean {
 }
 
 /**
- * Verifies if a user has an active subscription OR is a SUPERUSER
- * SUPERUSER bypasses the subscription requirement
- * Includes date-based expiry check for robustness against webhook delays
+ * Verifies if a user has an active subscription OR is a SUPERUSER.
+ * SUPERUSER bypasses the subscription requirement.
+ * Includes date-based expiry check for robustness against webhook delays.
  */
 export function hasActiveSubscriptionOrIsSuperuser(
   role: UserRole,
   subscription: Subscription | null | undefined
 ): boolean {
-  // SUPERUSER always has access without subscription
   if (role === UserRole.SUPERUSER) {
     return true;
   }
 
-  // Other roles need an active subscription
   if (!subscription) {
     return false;
   }
 
-  // Check if status indicates active subscription
   if (!ACTIVE_SUBSCRIPTION_STATUSES.includes(subscription.status as any)) {
     return false;
   }
 
-  // Additional check: verify subscription hasn't expired based on dates
   if (isSubscriptionExpiredByDate(subscription)) {
     return false;
   }
@@ -57,9 +51,8 @@ export function hasActiveSubscriptionOrIsSuperuser(
 }
 
 /**
- * Checks only if the subscription is active
- * (Does NOT bypass for SUPERUSER)
- * Includes date-based expiry check for robustness against webhook delays
+ * Checks only if the subscription is active (does NOT bypass for SUPERUSER).
+ * Includes date-based expiry check for robustness against webhook delays.
  */
 export function hasActiveSubscription(
   subscription: Subscription | null | undefined
@@ -68,12 +61,10 @@ export function hasActiveSubscription(
     return false;
   }
 
-  // Check if status indicates active subscription
   if (!ACTIVE_SUBSCRIPTION_STATUSES.includes(subscription.status as any)) {
     return false;
   }
 
-  // Additional check: verify subscription hasn't expired based on dates
   if (isSubscriptionExpiredByDate(subscription)) {
     return false;
   }

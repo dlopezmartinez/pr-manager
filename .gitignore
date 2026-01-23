@@ -119,6 +119,7 @@ Thumbs.db
 packages/backend/dist/
 packages/backend/prisma/*.db
 packages/backend/prisma/*.db-journal
+packages/backend/postman/
 
 # Landing specific
 packages/landing/.astro/
@@ -127,6 +128,8 @@ packages/landing/dist/
 # App specific
 packages/app/out/
 packages/app/.vite/
+packages/app/.env.development
+packages/app/.env.production
 
 # Playwright
 /test-results/

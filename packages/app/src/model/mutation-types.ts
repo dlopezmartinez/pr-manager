@@ -1,10 +1,4 @@
-/**
- * TypeScript types for GitHub GraphQL Mutations
- */
-
 import type { Author } from './types';
-
-// ===== Input Types =====
 
 export type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
 
@@ -27,8 +21,6 @@ export interface MergePullRequestInput {
   commitBody?: string;
   mergeMethod?: MergeMethod;
 }
-
-// ===== Response Types =====
 
 export interface ReviewResponse {
   id: string;
@@ -53,8 +45,6 @@ export interface MergeResponse {
   mergedAt: string | null;
   url: string;
 }
-
-// ===== API Response Wrappers =====
 
 export interface AddPullRequestReviewResponse {
   data: {
@@ -94,8 +84,6 @@ export interface GetPRNodeIdResponse {
     };
   };
 }
-
-// ===== Action Result Types =====
 
 export interface ActionResult<T> {
   success: boolean;

@@ -1,16 +1,8 @@
-/**
- * Tray Icon Generator
- * Creates a pull request / git-merge style icon for the system tray
- */
-
 import { nativeImage, NativeImage } from 'electron';
 import { TRAY_ICON_SIZE } from './constants';
 
 const isMac = process.platform === 'darwin';
 
-/**
- * Set a pixel in the image buffer with alpha blending
- */
 function setPixel(
   buffer: Buffer,
   width: number,
@@ -30,7 +22,6 @@ function setPixel(
     buffer[idx + 2] = 0;
   } else {
     if (isBackground) {
-      // Dark background for Windows tray icon contrast
       buffer[idx] = 30;
       buffer[idx + 1] = 30;
       buffer[idx + 2] = 30;
@@ -43,9 +34,6 @@ function setPixel(
   buffer[idx + 3] = Math.min(255, Math.floor(alpha * 255));
 }
 
-/**
- * Draw a rounded rectangle background (for Windows contrast)
- */
 function drawRoundedBackground(
   buffer: Buffer,
   width: number,
@@ -55,28 +43,23 @@ function drawRoundedBackground(
 ): void {
   for (let y = padding; y < height - padding; y++) {
     for (let x = padding; x < width - padding; x++) {
-      // Calculate distance from corners
       let alpha = 1;
 
-      // Top-left corner
       if (x < padding + radius && y < padding + radius) {
         const dist = Math.sqrt((x - (padding + radius)) ** 2 + (y - (padding + radius)) ** 2);
         if (dist > radius) continue;
         if (dist > radius - 1) alpha = radius - dist;
       }
-      // Top-right corner
       else if (x > width - padding - radius && y < padding + radius) {
         const dist = Math.sqrt((x - (width - padding - radius)) ** 2 + (y - (padding + radius)) ** 2);
         if (dist > radius) continue;
         if (dist > radius - 1) alpha = radius - dist;
       }
-      // Bottom-left corner
       else if (x < padding + radius && y > height - padding - radius) {
         const dist = Math.sqrt((x - (padding + radius)) ** 2 + (y - (height - padding - radius)) ** 2);
         if (dist > radius) continue;
         if (dist > radius - 1) alpha = radius - dist;
       }
-      // Bottom-right corner
       else if (x > width - padding - radius && y > height - padding - radius) {
         const dist = Math.sqrt((x - (width - padding - radius)) ** 2 + (y - (height - padding - radius)) ** 2);
         if (dist > radius) continue;
@@ -88,9 +71,6 @@ function drawRoundedBackground(
   }
 }
 
-/**
- * Draw an anti-aliased circle
- */
 function drawCircle(
   buffer: Buffer,
   width: number,
@@ -119,9 +99,6 @@ function drawCircle(
   }
 }
 
-/**
- * Draw an anti-aliased line
- */
 function drawLine(
   buffer: Buffer,
   width: number,
@@ -136,12 +113,12 @@ function drawLine(
   const dy = y2 - y1;
   const length = Math.sqrt(dx * dx + dy * dy);
   const steps = Math.ceil(length * 2);
-  
+
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const x = x1 + dx * t;
     const y = y1 + dy * t;
-    
+
     for (let ox = -thickness; ox <= thickness; ox++) {
       for (let oy = -thickness; oy <= thickness; oy++) {
         const dist = Math.sqrt(ox * ox + oy * oy);
@@ -154,16 +131,12 @@ function drawLine(
   }
 }
 
-/**
- * Create a pull request / git-merge style icon for the menubar
- */
 export function createTrayIcon(): NativeImage {
   const width = TRAY_ICON_SIZE;
   const height = TRAY_ICON_SIZE;
   const channels = 4;
   const buffer = Buffer.alloc(width * height * channels);
 
-  // Draw dark rounded background for Windows (improves contrast on light taskbar)
   if (!isMac) {
     drawRoundedBackground(buffer, width, height, 0, 3);
   }
@@ -183,9 +156,6 @@ export function createTrayIcon(): NativeImage {
   return icon;
 }
 
-/**
- * Draw an arc (partial circle) with rotation support
- */
 function drawArc(
   buffer: Buffer,
   width: number,
@@ -217,9 +187,6 @@ function drawArc(
   }
 }
 
-/**
- * Draw an arrowhead
- */
 function drawArrowhead(
   buffer: Buffer,
   width: number,
@@ -236,17 +203,12 @@ function drawArrowhead(
   drawLine(buffer, width, height, x, y, x + size * Math.cos(angle2), y + size * Math.sin(angle2), 1.3);
 }
 
-/**
- * Create a single frame of the syncing/refresh icon with rotation
- * @param rotation Rotation angle in radians
- */
 export function createSyncingIconFrame(rotation = 0): NativeImage {
   const width = TRAY_ICON_SIZE;
   const height = TRAY_ICON_SIZE;
   const channels = 4;
   const buffer = Buffer.alloc(width * height * channels);
 
-  // Draw dark rounded background for Windows (improves contrast on light taskbar)
   if (!isMac) {
     drawRoundedBackground(buffer, width, height, 0, 3);
   }
@@ -277,10 +239,6 @@ export function createSyncingIconFrame(rotation = 0): NativeImage {
   return icon;
 }
 
-/**
- * Create all animation frames for the syncing icon
- * @param frameCount Number of frames in the animation
- */
 export function createSyncingIconFrames(frameCount = 8): NativeImage[] {
   const frames: NativeImage[] = [];
   for (let i = 0; i < frameCount; i++) {

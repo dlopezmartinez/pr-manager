@@ -7,10 +7,8 @@
     tabindex="0"
     @keydown.enter="$emit('click')"
   >
-    <!-- Unread indicator -->
     <div v-if="!notification.read" class="unread-dot" />
 
-    <!-- Content -->
     <div class="notification-content">
       <div class="notification-header">
         <div class="type-badge" :class="notification.type">
@@ -28,7 +26,6 @@
       </div>
     </div>
 
-    <!-- Actions -->
     <div class="notification-actions" @click.stop>
       <button
         class="action-btn dismiss-btn"

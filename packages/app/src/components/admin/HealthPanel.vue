@@ -19,14 +19,12 @@
     </div>
 
     <div v-else-if="health" class="health-grid">
-      <!-- Status Card -->
       <div class="health-card">
         <h3>Status</h3>
         <p :class="['status-badge', health.status]">{{ health.status.toUpperCase() }}</p>
         <p class="timestamp">{{ health.timestamp }}</p>
       </div>
 
-      <!-- Database Card -->
       <div class="health-card">
         <h3>Database</h3>
         <p :class="['status', health.database.connected ? 'connected' : 'disconnected']">
@@ -35,7 +33,6 @@
         <p class="metric">Response: {{ health.database.checkTime }}</p>
       </div>
 
-      <!-- Users Card -->
       <div class="health-card">
         <h3>Users</h3>
         <div class="metrics">
@@ -58,13 +55,11 @@
         </div>
       </div>
 
-      <!-- Sessions Card -->
       <div class="health-card">
         <h3>Sessions</h3>
         <p class="metric">Active: {{ health.sessions.active }}</p>
       </div>
 
-      <!-- Subscriptions Card -->
       <div class="health-card">
         <h3>Subscriptions</h3>
         <div class="metrics">
@@ -83,7 +78,6 @@
         </div>
       </div>
 
-      <!-- Webhooks Card -->
       <div class="health-card">
         <h3>Webhooks</h3>
         <div class="metrics">
@@ -102,7 +96,6 @@
         </div>
       </div>
 
-      <!-- System Info Card -->
       <div class="health-card">
         <h3>System</h3>
         <div class="metrics">

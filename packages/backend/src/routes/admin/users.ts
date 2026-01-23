@@ -8,10 +8,6 @@ import { getQueryString, getQueryBoolean, getQueryNumber, toStr } from '../../ut
 
 const router = Router();
 
-/**
- * GET /admin/users
- * List all users with optional filtering and pagination
- */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, getQueryNumber(req.query.page) || 1);
@@ -20,25 +16,21 @@ router.get('/', async (req: Request, res: Response) => {
 
     const where: any = {};
 
-    // Filter by role
     const role = getQueryString(req.query.role);
     if (role) {
       where.role = role;
     }
 
-    // Filter by active status
     const isActive = getQueryBoolean(req.query.isActive);
     if (isActive !== undefined) {
       where.isActive = isActive;
     }
 
-    // Filter by suspended status
     const isSuspended = getQueryBoolean(req.query.isSuspended);
     if (isSuspended !== undefined) {
       where.isSuspended = isSuspended;
     }
 
-    // Search by email or name
     const search = getQueryString(req.query.search);
     if (search) {
       where.OR = [
@@ -85,10 +77,6 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /admin/users/:id
- * Get detailed user information
- */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
@@ -128,10 +116,6 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * PATCH /admin/users/:id/role
- * Change user role (SUPERUSER only)
- */
 router.patch('/:id/role', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
@@ -144,7 +128,6 @@ router.patch('/:id/role', requireSuperuser, async (req: Request, res: Response) 
       return;
     }
 
-    // Prevent self-modification
     if (req.params.id === req.user!.userId) {
       res.status(400).json({ error: 'Cannot change your own role' });
       return;
@@ -199,10 +182,6 @@ router.patch('/:id/role', requireSuperuser, async (req: Request, res: Response) 
   }
 });
 
-/**
- * POST /admin/users/:id/suspend
- * Suspend a user account (SUPERUSER only)
- */
 router.post('/:id/suspend', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const schema = z.object({
@@ -215,7 +194,6 @@ router.post('/:id/suspend', requireSuperuser, async (req: Request, res: Response
       return;
     }
 
-    // Prevent self-suspension
     if (req.params.id === req.user!.userId) {
       res.status(400).json({ error: 'Cannot suspend yourself' });
       return;
@@ -246,7 +224,6 @@ router.post('/:id/suspend', requireSuperuser, async (req: Request, res: Response
         },
       });
 
-      // Invalidate all sessions for this user
       await tx.session.deleteMany({
         where: { userId: toStr(req.params.id) || '' },
       });
@@ -273,13 +250,8 @@ router.post('/:id/suspend', requireSuperuser, async (req: Request, res: Response
   }
 });
 
-/**
- * POST /admin/users/:id/unsuspend
- * Reactivate a suspended user (SUPERUSER only)
- */
 router.post('/:id/unsuspend', requireSuperuser, async (req: Request, res: Response) => {
   try {
-    // Prevent self-unsuspension (though shouldn't be needed due to suspend check)
     if (req.params.id === req.user!.userId) {
       res.status(400).json({ error: 'Cannot unsuspend yourself' });
       return;
@@ -330,13 +302,8 @@ router.post('/:id/unsuspend', requireSuperuser, async (req: Request, res: Respon
   }
 });
 
-/**
- * DELETE /admin/users/:id
- * Soft-delete a user account (SUPERUSER only)
- */
 router.delete('/:id', requireSuperuser, async (req: Request, res: Response) => {
   try {
-    // Prevent self-deletion
     if (req.params.id === req.user!.userId) {
       res.status(400).json({ error: 'Cannot delete yourself' });
       return;
@@ -358,7 +325,6 @@ router.delete('/:id', requireSuperuser, async (req: Request, res: Response) => {
     }
 
     await prisma.$transaction(async (tx) => {
-      // Soft delete: mark as inactive and revoke sessions
       await tx.user.update({
         where: { id: toStr(req.params.id) || '' },
         data: {

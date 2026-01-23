@@ -41,19 +41,16 @@ const sanitizedContent = computed(() => {
 
 <style scoped>
 .safe-html {
-  /* Base styling for sanitized content */
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
 
-/* Prevent images from overflowing container */
 .safe-html :deep(img) {
   max-width: 100%;
   height: auto;
   border-radius: 4px;
 }
 
-/* Style links for visibility */
 .safe-html :deep(a) {
   color: #0ea5e9;
   text-decoration: underline;
@@ -64,7 +61,6 @@ const sanitizedContent = computed(() => {
   text-decoration-thickness: 2px;
 }
 
-/* Style code blocks */
 .safe-html :deep(code) {
   background-color: #f3f4f6;
   color: #374151;
@@ -92,7 +88,6 @@ const sanitizedContent = computed(() => {
   border-radius: 0;
 }
 
-/* Style blockquotes */
 .safe-html :deep(blockquote) {
   border-left: 4px solid #d1d5db;
   padding-left: 1em;
@@ -102,7 +97,6 @@ const sanitizedContent = computed(() => {
   font-style: italic;
 }
 
-/* Style lists */
 .safe-html :deep(ul),
 .safe-html :deep(ol) {
   margin: 0.5em 0;
@@ -113,7 +107,6 @@ const sanitizedContent = computed(() => {
   margin: 0.25em 0;
 }
 
-/* Style headings */
 .safe-html :deep(h1) {
   font-size: 1.875em;
   font-weight: bold;
@@ -139,14 +132,12 @@ const sanitizedContent = computed(() => {
   margin: 0.25em 0;
 }
 
-/* Style horizontal rules */
 .safe-html :deep(hr) {
   border: none;
   border-top: 1px solid #d1d5db;
   margin: 1em 0;
 }
 
-/* Ensure proper text rendering */
 .safe-html :deep(p) {
   margin: 0.5em 0;
   line-height: 1.6;

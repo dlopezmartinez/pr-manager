@@ -11,7 +11,6 @@ import type {
 } from '../types/admin.js';
 
 interface AdminState {
-  // Data
   users: AdminUser[];
   sessions: AdminSession[];
   subscriptions: AdminSubscription[];
@@ -20,14 +19,12 @@ interface AdminState {
   configs: SystemConfig[];
   systemHealth: SystemHealth | null;
 
-  // Pagination
   usersPagination: PaginationInfo | null;
   sessionsPagination: PaginationInfo | null;
   subscriptionsPagination: PaginationInfo | null;
   webhooksPagination: PaginationInfo | null;
   auditLogsPagination: PaginationInfo | null;
 
-  // UI State
   loading: boolean;
   error: string | null;
   selectedUser: AdminUser | null;
@@ -62,7 +59,6 @@ const state = reactive<AdminState>({
 export const adminStore = {
   state: readonly(state),
 
-  // Users setters
   setUsers(users: AdminUser[], pagination?: PaginationInfo) {
     state.users = users;
     if (pagination) state.usersPagination = pagination;
@@ -72,7 +68,6 @@ export const adminStore = {
     state.selectedUser = user;
   },
 
-  // Sessions setters
   setSessions(sessions: AdminSession[], pagination?: PaginationInfo) {
     state.sessions = sessions;
     if (pagination) state.sessionsPagination = pagination;
@@ -82,7 +77,6 @@ export const adminStore = {
     state.selectedSession = session;
   },
 
-  // Subscriptions setters
   setSubscriptions(subscriptions: AdminSubscription[], pagination?: PaginationInfo) {
     state.subscriptions = subscriptions;
     if (pagination) state.subscriptionsPagination = pagination;
@@ -92,7 +86,6 @@ export const adminStore = {
     state.selectedSubscription = subscription;
   },
 
-  // Webhooks setters
   setWebhooks(webhooks: AdminWebhook[], pagination?: PaginationInfo) {
     state.webhooks = webhooks;
     if (pagination) state.webhooksPagination = pagination;
@@ -102,23 +95,19 @@ export const adminStore = {
     state.selectedWebhook = webhook;
   },
 
-  // Audit logs setters
   setAuditLogs(logs: AuditLog[], pagination?: PaginationInfo) {
     state.auditLogs = logs;
     if (pagination) state.auditLogsPagination = pagination;
   },
 
-  // Config setters
   setConfigs(configs: SystemConfig[]) {
     state.configs = configs;
   },
 
-  // Health setters
   setSystemHealth(health: SystemHealth) {
     state.systemHealth = health;
   },
 
-  // UI state setters
   setLoading(loading: boolean) {
     state.loading = loading;
   },
@@ -131,7 +120,6 @@ export const adminStore = {
     state.error = null;
   },
 
-  // Clear all data
   clearAll() {
     state.users = [];
     state.sessions = [];

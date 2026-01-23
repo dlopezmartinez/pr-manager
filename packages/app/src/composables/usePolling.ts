@@ -4,13 +4,9 @@ import { COUNTDOWN_UPDATE_INTERVAL_MS } from '../utils/constants';
 import { pollingLogger } from '../utils/logger';
 
 export interface UsePollingOptions {
-  /** Function to call on each poll */
   onPoll: () => Promise<void> | void;
-  /** Whether to poll immediately on start */
   immediate?: boolean;
-  /** Timeout for each poll in ms (default: 30000) */
   pollTimeout?: number;
-  /** Custom polling interval in milliseconds. If not provided, uses configStore.pollingInterval */
   interval?: number;
 }
 
@@ -25,7 +21,6 @@ export function usePolling(options: UsePollingOptions) {
   let isPollInProgress = false;
 
   const isEnabled = computed(() => configStore.pollingEnabled);
-  // Use custom interval if provided, otherwise fall back to configStore
   const interval = computed(() =>
     customInterval !== undefined
       ? customInterval
@@ -44,10 +39,6 @@ export function usePolling(options: UsePollingOptions) {
     }
   }
 
-  /**
-   * Execute a poll with timeout protection
-   * Schedules next poll after completion (not during)
-   */
   async function executePoll(scheduleNext = true): Promise<void> {
     if (isPollInProgress) {
       pollingLogger.debug('Poll already in progress, skipping');
@@ -77,16 +68,12 @@ export function usePolling(options: UsePollingOptions) {
     } finally {
       isPollInProgress = false;
 
-      // Schedule next poll AFTER current one completes
       if (scheduleNext && isPolling.value && isEnabled.value) {
         scheduleNextPoll();
       }
     }
   }
 
-  /**
-   * Schedule the next poll using setTimeout
-   */
   function scheduleNextPoll(): void {
     if (pollTimeoutId) {
       clearTimeout(pollTimeoutId);
@@ -109,16 +96,13 @@ export function usePolling(options: UsePollingOptions) {
     isPolling.value = true;
     pollingLogger.debug('Starting polling with interval:', interval.value, 'ms');
 
-    // Start countdown timer
     updateCountdown();
     countdownId = setInterval(updateCountdown, COUNTDOWN_UPDATE_INTERVAL_MS);
 
     if (immediate) {
-      // Execute immediately, next poll will be scheduled after completion
       executePoll();
     } else {
       lastPollTime.value = new Date();
-      // Schedule first poll
       scheduleNextPoll();
     }
   }
@@ -138,19 +122,14 @@ export function usePolling(options: UsePollingOptions) {
     }
   }
 
-  /**
-   * Trigger an immediate poll and reschedule the next one
-   */
   async function pollNow(): Promise<void> {
     if (!isEnabled.value) return;
 
-    // Cancel any pending scheduled poll
     if (pollTimeoutId) {
       clearTimeout(pollTimeoutId);
       pollTimeoutId = null;
     }
 
-    // Execute poll - it will schedule next one after completion
     await executePoll();
   }
 
@@ -184,16 +163,13 @@ export function usePolling(options: UsePollingOptions) {
     pollingLogger.debug(`Visibility changed: hidden=${isHidden}, backgroundPolling=${isBackgroundPollingEnabled.value}, isPolling=${isPolling.value}`);
 
     if (isBackgroundPollingEnabled.value) {
-      // Background polling enabled: keep polling running, just trigger immediate poll when becoming visible
       if (!isHidden && isEnabled.value) {
         pollingLogger.debug('Window became visible with background polling, triggering immediate poll');
         pollNow().catch(console.error);
       }
-      // Don't stop polling when hidden - let it continue in background
       return;
     }
 
-    // Background polling disabled: pause when hidden, resume when visible
     if (isHidden) {
       pollingLogger.debug('Window hidden, pausing polling (background polling disabled)');
       stopPolling();

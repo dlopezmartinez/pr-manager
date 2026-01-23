@@ -1,8 +1,3 @@
-/**
- * FollowUpService
- * Handles polling of followed PRs to detect changes and create notifications
- */
-
 import type { PullRequestBasic } from '../model/types';
 import type { IPullRequestManager } from '../providers/interfaces';
 import {
@@ -26,9 +21,6 @@ export interface FollowUpPollingResult {
   errors: string[];
 }
 
-/**
- * FollowUpService - Polls followed PRs for changes
- */
 export class FollowUpService {
   private pullRequestManager: IPullRequestManager;
   private isPolling = false;
@@ -37,10 +29,6 @@ export class FollowUpService {
     this.pullRequestManager = pullRequestManager;
   }
 
-  /**
-   * Poll all followed PRs for changes
-   * Called during each polling cycle
-   */
   async pollFollowedPRs(): Promise<FollowUpPollingResult> {
     if (this.isPolling) {
       console.log('FollowUpService: Already polling, skipping');
@@ -64,7 +52,6 @@ export class FollowUpService {
 
       console.log(`FollowUpService: Polling ${followedPRs.length} followed PRs`);
 
-      // Poll PRs in parallel with concurrency limit
       const CONCURRENCY_LIMIT = 5;
       const chunks = this.chunkArray(followedPRs, CONCURRENCY_LIMIT);
 
@@ -73,7 +60,6 @@ export class FollowUpService {
         await Promise.all(promises);
       }
 
-      // Show native notification if there were changes
       if (result.changesDetected > 0 && configStore.notificationsEnabled) {
         this.showNativeNotification(result);
       }
@@ -91,9 +77,6 @@ export class FollowUpService {
     return result;
   }
 
-  /**
-   * Poll a single PR and detect changes
-   */
   private async pollSinglePR(
     info: FollowedPRInfo,
     result: FollowUpPollingResult
@@ -101,19 +84,16 @@ export class FollowUpService {
     try {
       const { owner, repo } = this.parseRepository(info.repoNameWithOwner);
 
-      // Fetch current PR state
       const currentPR = await this.pullRequestManager.getPullRequestDetails(
         owner,
         repo,
         info.prNumber,
-        false // Don't use cache - we need fresh data
+        false
       );
 
       result.checked++;
 
-      // Check if PR is closed/merged
       if (currentPR.state !== 'OPEN') {
-        // Remove from follow-up and add notification
         removeClosedPR(info.prId);
         addBatchNotifications(
           {
@@ -125,18 +105,16 @@ export class FollowUpService {
             authorLogin: info.authorLogin,
             authorAvatarUrl: info.authorAvatarUrl,
           },
-          {} // No specific changes, just status
+          {}
         );
         return;
       }
 
-      // Detect changes
       const changes = detectChanges(info.prId, currentPR as PullRequestBasic);
 
       if (changes.hasChanges) {
         result.changesDetected++;
 
-        // Filter changes based on user notification preferences
         const notificationChanges: {
           newCommits?: number;
           newComments?: number;
@@ -153,7 +131,6 @@ export class FollowUpService {
           notificationChanges.newReviews = changes.newReviews;
         }
 
-        // Only create notifications if there are changes the user wants to be notified about
         if (Object.keys(notificationChanges).length > 0) {
           console.log(`FollowUpService: Creating notifications for PR #${info.prNumber}:`, notificationChanges);
 
@@ -174,7 +151,6 @@ export class FollowUpService {
           result.notificationsCreated.push(...notifications);
         }
 
-        // Update the stored state (always update even if no notifications created)
         updatePRState(info.prId, currentPR as PullRequestBasic);
       }
     } catch (error) {
@@ -185,15 +161,11 @@ export class FollowUpService {
     }
   }
 
-  /**
-   * Show native OS notification for detected changes
-   */
   private showNativeNotification(result: FollowUpPollingResult): void {
     const notifications = result.notificationsCreated;
 
     if (notifications.length === 0) return;
 
-    // Group by PR for cleaner notifications
     const uniquePRs = new Map<string, typeof notifications[0]>();
     for (const notif of notifications) {
       if (!uniquePRs.has(notif.prId)) {
@@ -202,7 +174,6 @@ export class FollowUpService {
     }
 
     if (uniquePRs.size === 1) {
-      // Single PR notification
       const notif = notifications[0];
       const changeText = this.formatChangeText(notifications);
 
@@ -213,7 +184,6 @@ export class FollowUpService {
         url: notif.url,
       });
     } else {
-      // Multiple PRs notification
       showNotification({
         title: 'PR Updates',
         body: `${uniquePRs.size} followed PRs have updates`,
@@ -224,9 +194,6 @@ export class FollowUpService {
     }
   }
 
-  /**
-   * Format change text for notification
-   */
   private formatChangeText(notifications: InboxNotification[]): string {
     const parts: string[] = [];
 
@@ -252,17 +219,11 @@ export class FollowUpService {
     return parts.join(', ') || 'Updates';
   }
 
-  /**
-   * Parse owner and repo from nameWithOwner string
-   */
   private parseRepository(nameWithOwner: string): { owner: string; repo: string } {
     const [owner, repo] = nameWithOwner.split('/');
     return { owner, repo };
   }
 
-  /**
-   * Split array into chunks
-   */
   private chunkArray<T>(array: T[], size: number): T[][] {
     const chunks: T[][] = [];
     for (let i = 0; i < array.length; i += size) {
@@ -272,20 +233,13 @@ export class FollowUpService {
   }
 }
 
-// Singleton instance - will be initialized when provider is available
 let followUpServiceInstance: FollowUpService | null = null;
 
-/**
- * Initialize the follow-up service with a pull request manager
- */
 export function initializeFollowUpService(manager: IPullRequestManager): FollowUpService {
   followUpServiceInstance = new FollowUpService(manager);
   return followUpServiceInstance;
 }
 
-/**
- * Get the follow-up service instance
- */
 export function getFollowUpService(): FollowUpService | null {
   return followUpServiceInstance;
 }

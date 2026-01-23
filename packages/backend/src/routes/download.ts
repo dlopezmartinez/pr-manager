@@ -8,15 +8,6 @@ import { APP_VERSION } from '../lib/version.js';
 
 const router = Router();
 
-/**
- * GET /download/:platform/:version
- * Protected download endpoint with signed URL verification
- *
- * Query params:
- * - signature: HMAC signature for verification
- * - expires: Timestamp when the link expires
- * - user: User ID who requested the download
- */
 router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Response) => {
   try {
     const paramsSchema = z.object({
@@ -30,7 +21,6 @@ router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Res
       user: z.string().min(1).max(255, 'User ID too long'),
     });
 
-    // Validate path params
     const paramsValidation = paramsSchema.safeParse(req.params);
     if (!paramsValidation.success) {
       res.status(400).json({
@@ -40,7 +30,6 @@ router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Res
       return;
     }
 
-    // Validate query params
     const queryValidation = querySchema.safeParse(req.query);
     if (!queryValidation.success) {
       res.status(400).json({
@@ -53,7 +42,6 @@ router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Res
     const { platform, version } = paramsValidation.data;
     const { signature, expires, user: userId } = queryValidation.data;
 
-    // Verify the signed URL
     const verification = verifySignedDownload(userId, platform, version, signature, expires);
     if (!verification.valid) {
       res.status(403).json({
@@ -62,7 +50,6 @@ router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Res
       return;
     }
 
-    // Verify user exists and has access
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { subscription: true },
@@ -75,7 +62,6 @@ router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Res
       return;
     }
 
-    // Check if user has active subscription or is SUPERUSER
     if (!hasActiveSubscriptionOrIsSuperuser(user.role, user.subscription)) {
       res.status(403).json({
         error: 'Access denied. Active subscription required.',
@@ -84,13 +70,10 @@ router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Res
       return;
     }
 
-    // Get the GitHub release URL and redirect
     const downloadUrl = getGitHubReleaseUrl(platform, version);
 
-    // Log download for analytics (optional)
     console.log(`Download: user=${userId}, platform=${platform}, version=${version}`);
 
-    // Redirect to the actual download URL
     res.redirect(302, downloadUrl);
   } catch (error) {
     console.error('Download error:', error);
@@ -98,11 +81,6 @@ router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Res
   }
 });
 
-/**
- * GET /download/latest/:platform
- * Get the latest version download URL (requires valid signed params)
- * This could be used if you want to always redirect to the latest version
- */
 router.get('/latest/:platform', async (req: Request, res: Response) => {
   try {
     const paramsSchema = z.object({
@@ -130,17 +108,14 @@ router.get('/latest/:platform', async (req: Request, res: Response) => {
     const { platform } = paramsValidation.data;
     const { signature, expires, user: userId } = queryValidation.data;
 
-    // Get current version from package.json (synced by release workflow)
     const currentVersion = APP_VERSION;
 
-    // Verify signature with "latest" as version placeholder
     const verification = verifySignedDownload(userId, platform, 'latest', signature, expires);
     if (!verification.valid) {
       res.status(403).json({ error: verification.error || 'Invalid download link' });
       return;
     }
 
-    // Verify user exists and has access
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { subscription: true },
@@ -153,7 +128,6 @@ router.get('/latest/:platform', async (req: Request, res: Response) => {
       return;
     }
 
-    // Check if user has active subscription or is SUPERUSER
     if (!hasActiveSubscriptionOrIsSuperuser(user.role, user.subscription)) {
       res.status(403).json({
         error: 'Access denied. Active subscription required.',

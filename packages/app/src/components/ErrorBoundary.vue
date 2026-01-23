@@ -1,11 +1,4 @@
 <script setup lang="ts">
-/**
- * ErrorBoundary Component
- *
- * Catches errors in child components and displays a fallback UI.
- * Prevents the entire app from crashing when a component fails.
- */
-
 import { ref, onErrorCaptured } from 'vue';
 
 interface Props {
@@ -23,27 +16,18 @@ const emit = defineEmits<{
 const error = ref<Error | null>(null);
 const errorInfo = ref<string>('');
 
-/**
- * Capture errors from child components
- */
 onErrorCaptured((err: Error, instance, info: string) => {
   error.value = err;
   errorInfo.value = info;
 
-  // Emit error for parent handling/logging
   emit('error', err, info);
 
-  // Log to console for debugging
   console.error('ErrorBoundary caught error:', err);
   console.error('Component info:', info);
 
-  // Return false to stop error propagation
   return false;
 });
 
-/**
- * Reset error state to try rendering children again
- */
 function resetError() {
   error.value = null;
   errorInfo.value = '';

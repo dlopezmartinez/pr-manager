@@ -2,25 +2,15 @@ import { prisma } from '../lib/prisma.js';
 import { randomBytes, createHash } from 'crypto';
 import logger from '../lib/logger.js';
 
-/**
- * Generate a secure random secret
- */
 export function generateSecret(): string {
   return randomBytes(32).toString('hex');
 }
 
-/**
- * Hash a secret for storage (one-way)
- */
 export function hashSecret(secret: string): string {
   return createHash('sha256').update(secret).digest('hex');
 }
 
-/**
- * Create a new admin secret for a user
- */
 export async function createAdminSecret(userId: string, name: string): Promise<string> {
-  // Verify user exists and is SUPERUSER
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, role: true, email: true },
@@ -59,9 +49,6 @@ export async function createAdminSecret(userId: string, name: string): Promise<s
   }
 }
 
-/**
- * Get admin secret by hash (for auth)
- */
 export async function getAdminSecretByHash(secretHash: string) {
   return await prisma.adminSecret.findUnique({
     where: { secretHash },
@@ -78,9 +65,6 @@ export async function getAdminSecretByHash(secretHash: string) {
   });
 }
 
-/**
- * Update last used timestamp
- */
 export async function updateLastUsed(secretId: string): Promise<void> {
   try {
     await prisma.adminSecret.update({
@@ -89,13 +73,9 @@ export async function updateLastUsed(secretId: string): Promise<void> {
     });
   } catch (error) {
     logger.warn('Failed to update lastUsedAt for secret', { error, secretId });
-    // Don't throw - this is non-critical
   }
 }
 
-/**
- * List all secrets for a user
- */
 export async function listUserSecrets(userId: string) {
   return await prisma.adminSecret.findMany({
     where: { userId },
@@ -110,11 +90,7 @@ export async function listUserSecrets(userId: string) {
   });
 }
 
-/**
- * Revoke a secret
- */
 export async function revokeSecret(secretId: string, userId: string): Promise<void> {
-  // Verify ownership
   const secret = await prisma.adminSecret.findUnique({
     where: { id: secretId },
     select: { userId: true },
@@ -136,11 +112,7 @@ export async function revokeSecret(secretId: string, userId: string): Promise<vo
   logger.info('Admin secret revoked', { secretId, userId });
 }
 
-/**
- * Delete a secret
- */
 export async function deleteSecret(secretId: string, userId: string): Promise<void> {
-  // Verify ownership
   const secret = await prisma.adminSecret.findUnique({
     where: { id: secretId },
     select: { userId: true },

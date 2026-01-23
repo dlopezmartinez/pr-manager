@@ -7,10 +7,6 @@ import { getQueryNumber, getQueryBoolean, getQueryString, toStr } from '../../ut
 
 const router = Router();
 
-/**
- * GET /admin/webhooks
- * List webhook events with pagination
- */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, getQueryNumber(req.query.page) || 1);
@@ -19,12 +15,10 @@ router.get('/', async (req: Request, res: Response) => {
 
     const where: any = {};
 
-    // Filter by processed status
     if (req.query.processed !== undefined) {
       where.processed = req.query.processed === 'true';
     }
 
-    // Filter by event name
     if (req.query.eventName) {
       where.eventName = String(req.query.eventName);
     }
@@ -64,10 +58,6 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /admin/webhooks/:id
- * Get webhook event details
- */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const webhook = await prisma.webhookEvent.findUnique({
@@ -105,10 +95,6 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * POST /admin/webhooks/:id/retry
- * Retry processing a failed webhook (SUPERUSER only)
- */
 router.post('/:id/retry', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const webhook = await prisma.webhookEvent.findUnique({
@@ -121,9 +107,7 @@ router.post('/:id/retry', requireSuperuser, async (req: Request, res: Response) 
       return;
     }
 
-    // Reset error state and move to queue for retry
     const updated = await prisma.$transaction(async (tx) => {
-      // Clear error state
       const event = await tx.webhookEvent.update({
         where: { id: toStr(req.params.id) || '' },
         data: {
@@ -140,7 +124,6 @@ router.post('/:id/retry', requireSuperuser, async (req: Request, res: Response) 
         },
       });
 
-      // Create or update queue entry
       await tx.webhookQueue.upsert({
         where: { webhookEventId: toStr(req.params.id) || '' },
         create: {

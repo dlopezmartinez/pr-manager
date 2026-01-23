@@ -13,7 +13,6 @@
       </div>
 
       <div class="auth-form">
-        <!-- Login Form -->
         <div v-if="mode === 'login'" class="form-content">
           <h2>Welcome back</h2>
           <p class="form-subtitle">Sign in to continue</p>
@@ -64,7 +63,6 @@
           </p>
         </div>
 
-        <!-- Forgot Password Form -->
         <div v-else-if="mode === 'forgot-password'" class="form-content">
           <h2>Reset password</h2>
           <p class="form-subtitle">Enter your email to receive a reset link</p>
@@ -102,7 +100,6 @@
           </p>
         </div>
 
-        <!-- Signup Form -->
         <div v-else class="form-content">
           <h2>Start your free trial</h2>
           <p class="form-subtitle">14 days free, no credit card required</p>

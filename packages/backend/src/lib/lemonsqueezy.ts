@@ -1,8 +1,3 @@
-/**
- * LemonSqueezy API Client
- * Handles communication with LemonSqueezy for subscriptions
- */
-
 const LEMONSQUEEZY_API_URL = 'https://api.lemonsqueezy.com/v1';
 
 if (!process.env.LEMONSQUEEZY_API_KEY) {
@@ -106,9 +101,6 @@ export async function lemonSqueezyFetch<T>(
   return response.json() as Promise<T>;
 }
 
-/**
- * Create a checkout URL for a subscription
- */
 export async function createCheckout(
   variantId: string,
   email: string,
@@ -166,9 +158,6 @@ export async function createCheckout(
   };
 }
 
-/**
- * Get subscription by ID
- */
 export async function getSubscription(
   subscriptionId: string
 ): Promise<LemonSqueezySubscription> {
@@ -178,18 +167,12 @@ export async function getSubscription(
   return response.data;
 }
 
-/**
- * Cancel subscription (at period end)
- */
 export async function cancelSubscription(subscriptionId: string): Promise<void> {
   await lemonSqueezyFetch(`/subscriptions/${subscriptionId}`, {
     method: 'DELETE',
   });
 }
 
-/**
- * Resume/reactivate a cancelled subscription
- */
 export async function resumeSubscription(subscriptionId: string): Promise<void> {
   await lemonSqueezyFetch(`/subscriptions/${subscriptionId}`, {
     method: 'PATCH',
@@ -205,17 +188,11 @@ export async function resumeSubscription(subscriptionId: string): Promise<void> 
   });
 }
 
-/**
- * Get customer portal URL for a subscription
- */
 export async function getCustomerPortalUrl(subscriptionId: string): Promise<string> {
   const subscription = await getSubscription(subscriptionId);
   return subscription.attributes.urls.customer_portal;
 }
 
-/**
- * Verify webhook signature
- */
 export function verifyWebhookSignature(
   payload: string,
   signature: string,
@@ -225,8 +202,6 @@ export function verifyWebhookSignature(
   const hmac = crypto.createHmac('sha256', secret);
   const digest = hmac.update(payload).digest('hex');
 
-  // timingSafeEqual throws if buffer lengths differ
-  // Handle this case gracefully
   const signatureBuffer = Buffer.from(signature);
   const digestBuffer = Buffer.from(digest);
 

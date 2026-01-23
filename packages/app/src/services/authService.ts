@@ -1,9 +1,3 @@
-/**
- * Authentication Service
- * Handles communication with the PR Manager backend for auth and subscriptions
- * Uses HTTP interceptor for transparent token management and refresh
- */
-
 import type { AuthUser } from '../preload';
 import { httpPost, httpGet } from './http';
 
@@ -38,9 +32,6 @@ export interface PortalResponse {
 }
 
 class AuthService {
-  /**
-   * Initialize the auth service by loading the stored tokens
-   */
   async initialize(): Promise<boolean> {
     try {
       const accessToken = await window.electronAPI.auth.getToken();
@@ -51,9 +42,6 @@ class AuthService {
     }
   }
 
-  /**
-   * Get the current access token
-   */
   async getAccessToken(): Promise<string | null> {
     try {
       return await window.electronAPI.auth.getToken();
@@ -63,17 +51,11 @@ class AuthService {
     }
   }
 
-  /**
-   * Check if user is authenticated (has valid access token)
-   */
   async isAuthenticated(): Promise<boolean> {
     const token = await this.getAccessToken();
     return !!token;
   }
 
-  /**
-   * Sign up a new user
-   */
   async signup(email: string, password: string, name?: string): Promise<AuthResponse> {
     const response = await httpPost(`${API_URL}/auth/signup`, {
       email,
@@ -91,9 +73,6 @@ class AuthService {
     return data;
   }
 
-  /**
-   * Log in an existing user
-   */
   async login(email: string, password: string): Promise<AuthResponse> {
     const response = await httpPost(`${API_URL}/auth/login`, {
       email,
@@ -110,9 +89,6 @@ class AuthService {
     return data;
   }
 
-  /**
-   * Verify the current token is still valid
-   */
   async verifyToken(): Promise<{ valid: boolean; user?: AuthUser }> {
     const token = await this.getAccessToken();
     if (!token) {
@@ -140,14 +116,6 @@ class AuthService {
     }
   }
 
-  /**
-   * Health check - lightweight token validation
-   * Uses HTTP interceptor which handles:
-   * - Token refresh on expiry
-   * - User suspension detection
-   * - Session revocation detection
-   * Returns true if token is valid, false otherwise
-   */
   async checkHealth(): Promise<boolean> {
     const token = await this.getAccessToken();
     if (!token) {
@@ -155,33 +123,24 @@ class AuthService {
     }
 
     try {
-      // Use httpGet to go through the interceptor
-      // The interceptor will emit auth error events for suspension/revocation
       const response = await httpGet(`${API_URL}/auth/health`);
 
       if (response.ok) {
         return true;
       }
 
-      // 401/403 are handled by the interceptor (emits events, clears tokens)
-      // We just return false here
       if (response.status === 401 || response.status === 403) {
         return false;
       }
 
-      // Other errors (5xx, network) - don't clear auth
       console.warn('[AuthService] Health check failed with status:', response.status);
-      return true; // Assume token is still valid on server errors
+      return true;
     } catch (error) {
-      // Network error - don't clear auth, just log
       console.error('[AuthService] Health check network error:', error);
-      return true; // Assume token is still valid on network errors
+      return true;
     }
   }
 
-  /**
-   * Get subscription status for the current user
-   */
   async getSubscriptionStatus(): Promise<SubscriptionStatus> {
     const token = await this.getAccessToken();
     if (!token) {
@@ -206,9 +165,6 @@ class AuthService {
     }
   }
 
-  /**
-   * Create a checkout session for subscription
-   */
   async createCheckoutSession(priceId: 'monthly' | 'yearly'): Promise<CheckoutResponse> {
     const token = await this.getAccessToken();
     if (!token) {
@@ -227,9 +183,6 @@ class AuthService {
     return await response.json();
   }
 
-  /**
-   * Open the Stripe customer portal for subscription management
-   */
   async openCustomerPortal(): Promise<PortalResponse> {
     const token = await this.getAccessToken();
     if (!token) {
@@ -246,9 +199,6 @@ class AuthService {
     return await response.json();
   }
 
-  /**
-   * Cancel subscription at period end
-   */
   async cancelSubscription(): Promise<void> {
     const token = await this.getAccessToken();
     if (!token) {
@@ -263,9 +213,6 @@ class AuthService {
     }
   }
 
-  /**
-   * Reactivate a subscription that was set to cancel
-   */
   async reactivateSubscription(): Promise<void> {
     const token = await this.getAccessToken();
     if (!token) {
@@ -280,16 +227,10 @@ class AuthService {
     }
   }
 
-  /**
-   * Log out the current user
-   */
   async logout(): Promise<void> {
     await this.clearAuth();
   }
 
-  /**
-   * Request password reset email
-   */
   async forgotPassword(email: string): Promise<{ message: string }> {
     const response = await httpPost(`${API_URL}/auth/forgot-password`, { email });
 
@@ -301,9 +242,6 @@ class AuthService {
     return response.json();
   }
 
-  /**
-   * Reset password with token
-   */
   async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
     const response = await httpPost(`${API_URL}/auth/reset-password`, {
       token,
@@ -318,10 +256,6 @@ class AuthService {
     return response.json();
   }
 
-  /**
-   * Sync subscription status with LemonSqueezy
-   * Use when webhook might have failed
-   */
   async syncSubscription(): Promise<{
     synced: boolean;
     status: string;
@@ -343,9 +277,6 @@ class AuthService {
     return response.json();
   }
 
-  /**
-   * Store tokens securely (using electron safe storage)
-   */
   private async setTokens(accessToken: string, refreshToken: string): Promise<void> {
     await window.electronAPI.auth.setToken(accessToken);
     if (window.electronAPI.auth.setRefreshToken) {
@@ -353,9 +284,6 @@ class AuthService {
     }
   }
 
-  /**
-   * Clear all auth data
-   */
   private async clearAuth(): Promise<void> {
     await window.electronAPI.auth.clearToken();
     if (window.electronAPI.auth.clearRefreshToken) {
@@ -364,5 +292,4 @@ class AuthService {
   }
 }
 
-// Singleton instance
 export const authService = new AuthService();

@@ -13,15 +13,10 @@ import { paymentFailedTemplate } from '../templates/emails.js';
 
 const router = Router();
 
-/**
- * Process a webhook event by its name
- * Exported for use by the webhook queue processor
- */
 export async function processWebhookByName(
   eventName: string,
   eventData: Record<string, unknown>
 ): Promise<void> {
-  // Reconstruct the event structure expected by handlers
   const event = {
     data: eventData,
     meta: (eventData as any).meta || { custom_data: {} },
@@ -60,25 +55,18 @@ export async function processWebhookByName(
   }
 }
 
-/**
- * POST /webhooks/lemonsqueezy
- * Handle LemonSqueezy webhook events with audit trail
- * Note: This route uses raw body parsing for signature verification
- */
 router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res: Response) => {
   const event = req.lemonSqueezyEvent!;
   const eventName = event.meta.event_name;
-  const eventId = event.data.id; // LemonSqueezy event ID for deduplication
+  const eventId = event.data.id;
 
   console.log(`[Webhook] Received: ${eventName} (${eventId})`);
 
   let webhookEventId = '';
 
   try {
-    // PASO 1: LOG INMEDIATAMENTE (antes de procesar)
     webhookEventId = await logWebhookEvent(eventId, eventName, event.data);
 
-    // PASO 2: CHECK IDEMPOTENCY - si ya fue procesado, skip processing
     const existingEvent = await getWebhookEvent(webhookEventId);
     if (existingEvent?.processed === true) {
       console.log(`[Webhook] Event already processed (idempotent), skipping: ${eventId}`);
@@ -86,7 +74,6 @@ router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res
       return;
     }
 
-    // PASO 3: Procesamiento (con try-catch)
     switch (eventName) {
       case 'subscription_created':
         await handleSubscriptionCreated(event);
@@ -128,21 +115,16 @@ router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res
         console.log(`[Webhook] Unhandled event type: ${eventName}`);
     }
 
-    // PASO 4: Mark as processed successfully
     await markWebhookProcessed(webhookEventId);
 
-    // PASO 5: SIEMPRE respond 200 (LemonSqueezy requirement)
     res.json({ received: true, eventId: webhookEventId });
   } catch (error) {
     console.error(`[Webhook] Error handling ${eventName}:`, error);
 
-    // Log error to audit trail (pero no re-throw)
     if (webhookEventId) {
       await logWebhookError(webhookEventId, error as Error, true);
     }
 
-    // IMPORTANTE: Still return 200 to LemonSqueezy
-    // Error is logged in audit trail and will be retried
     res.json({
       received: true,
       eventId: webhookEventId,
@@ -151,9 +133,6 @@ router.post('/lemonsqueezy', verifyLemonSqueezyWebhook, async (req: Request, res
   }
 });
 
-/**
- * Handle subscription created (transactional)
- */
 async function handleSubscriptionCreated(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data, meta } = event;
   const userId = meta.custom_data?.user_id;
@@ -165,11 +144,9 @@ async function handleSubscriptionCreated(event: LemonSqueezyWebhookEvent): Promi
 
   const attrs = data.attributes;
 
-  // Calculate period dates
   const now = new Date();
   const renewsAt = attrs.renews_at ? new Date(attrs.renews_at) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  // Use transaction to ensure subscription is created atomically
   await prisma.$transaction(async (tx) => {
     await tx.subscription.upsert({
       where: { lemonSqueezySubscriptionId: data.id },
@@ -198,9 +175,6 @@ async function handleSubscriptionCreated(event: LemonSqueezyWebhookEvent): Promi
   console.log(`[Webhook] Subscription ${data.id} created for user ${userId}: ${attrs.status}`);
 }
 
-/**
- * Handle subscription updated (transactional)
- */
 async function handleSubscriptionUpdated(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
@@ -223,9 +197,6 @@ async function handleSubscriptionUpdated(event: LemonSqueezyWebhookEvent): Promi
   console.log(`[Webhook] Subscription ${data.id} updated: ${attrs.status}`);
 }
 
-/**
- * Handle subscription cancelled (set to cancel at period end) (transactional)
- */
 async function handleSubscriptionCancelled(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
@@ -243,9 +214,6 @@ async function handleSubscriptionCancelled(event: LemonSqueezyWebhookEvent): Pro
   console.log(`[Webhook] Subscription ${data.id} cancelled (will end at period end)`);
 }
 
-/**
- * Handle subscription resumed (transactional)
- */
 async function handleSubscriptionResumed(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
@@ -263,9 +231,6 @@ async function handleSubscriptionResumed(event: LemonSqueezyWebhookEvent): Promi
   console.log(`[Webhook] Subscription ${data.id} resumed`);
 }
 
-/**
- * Handle subscription expired (transactional)
- */
 async function handleSubscriptionExpired(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
 
@@ -281,9 +246,6 @@ async function handleSubscriptionExpired(event: LemonSqueezyWebhookEvent): Promi
   console.log(`[Webhook] Subscription ${data.id} expired`);
 }
 
-/**
- * Handle subscription paused (transactional)
- */
 async function handleSubscriptionPaused(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
 
@@ -299,9 +261,6 @@ async function handleSubscriptionPaused(event: LemonSqueezyWebhookEvent): Promis
   console.log(`[Webhook] Subscription ${data.id} paused`);
 }
 
-/**
- * Handle subscription unpaused (transactional)
- */
 async function handleSubscriptionUnpaused(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
@@ -318,15 +277,11 @@ async function handleSubscriptionUnpaused(event: LemonSqueezyWebhookEvent): Prom
   console.log(`[Webhook] Subscription ${data.id} unpaused`);
 }
 
-/**
- * Handle successful payment (transactional)
- */
 async function handlePaymentSuccess(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
 
   await prisma.$transaction(async (tx) => {
-    // Update status to active if it was past_due
     await tx.subscription.updateMany({
       where: {
         lemonSqueezySubscriptionId: data.id,
@@ -342,26 +297,21 @@ async function handlePaymentSuccess(event: LemonSqueezyWebhookEvent): Promise<vo
   console.log(`[Webhook] Payment succeeded for subscription ${data.id}`);
 }
 
-/**
- * Handle failed payment (transactional)
- */
 async function handlePaymentFailed(event: LemonSqueezyWebhookEvent): Promise<void> {
   const { data } = event;
   const attrs = data.attributes;
 
   await prisma.$transaction(async (tx) => {
-    // Update subscription status to past_due
     await tx.subscription.updateMany({
       where: { lemonSqueezySubscriptionId: data.id },
       data: {
-        status: attrs.status, // Usually 'past_due' when payment fails
+        status: attrs.status,
       },
     });
   });
 
   console.log(`[Webhook] Payment failed for subscription ${data.id}, status: ${attrs.status}`);
 
-  // Send email notification
   try {
     const subscription = await prisma.subscription.findUnique({
       where: { lemonSqueezySubscriptionId: data.id },
@@ -382,12 +332,10 @@ async function handlePaymentFailed(event: LemonSqueezyWebhookEvent): Promise<voi
       console.log(`[Webhook] Payment failure email sent to ${subscription.user.email}`);
     }
   } catch (emailError) {
-    // Don't fail the webhook if email fails
     console.error('[Webhook] Failed to send payment failure email:', emailError);
   }
 }
 
-// Helper to safely extract query params
 function getQueryString(value: string | string[] | undefined): string | undefined {
   if (!value) return undefined;
   return Array.isArray(value) ? value[0] : value;
@@ -400,11 +348,6 @@ function getQueryNumber(value: string | string[] | undefined, defaultValue: numb
   return isNaN(num) ? defaultValue : num;
 }
 
-/**
- * GET /webhooks/audit/events
- * List all webhook events (with pagination)
- * Admin only (requires authentication)
- */
 router.get('/audit/events', authenticate, async (req: Request, res: Response) => {
   try {
     const skip = getQueryNumber(req.query.skip as any, 0);
@@ -429,10 +372,6 @@ router.get('/audit/events', authenticate, async (req: Request, res: Response) =>
   }
 });
 
-/**
- * GET /webhooks/audit/events/:id
- * Get specific webhook event details
- */
 router.get('/audit/events/:id', authenticate, async (req: Request, res: Response) => {
   try {
     const id = typeof req.params.id === 'string' ? req.params.id : req.params.id[0];
@@ -453,11 +392,6 @@ router.get('/audit/events/:id', authenticate, async (req: Request, res: Response
   }
 });
 
-/**
- * POST /webhooks/audit/events/:id/replay
- * Replay a failed webhook
- * Admin only (requires authentication)
- */
 router.post('/audit/events/:id/replay', authenticate, async (req: Request, res: Response) => {
   try {
     const id = typeof req.params.id === 'string' ? req.params.id : req.params.id[0];
@@ -470,7 +404,6 @@ router.post('/audit/events/:id/replay', authenticate, async (req: Request, res: 
       return;
     }
 
-    // Reset for reprocessing
     await prisma.webhookEvent.update({
       where: { id },
       data: {

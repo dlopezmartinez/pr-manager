@@ -7,10 +7,6 @@ import { getQueryNumber, getQueryString, toStr } from '../../utils/queryParams.j
 
 const router = Router();
 
-/**
- * GET /admin/sessions
- * List all active sessions with pagination
- */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, getQueryNumber(req.query.page) || 1);
@@ -50,10 +46,6 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /admin/sessions/user/:userId
- * Get sessions for a specific user
- */
 router.get('/user/:userId', async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -91,10 +83,6 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * DELETE /admin/sessions/:id
- * Revoke a specific session (SUPERUSER only)
- */
 router.delete('/:id', requireSuperuser, async (req: Request, res: Response) => {
   try {
     const session = await prisma.session.findUnique({
@@ -133,13 +121,8 @@ router.delete('/:id', requireSuperuser, async (req: Request, res: Response) => {
   }
 });
 
-/**
- * DELETE /admin/sessions/user/:userId/all
- * Revoke all sessions for a user (SUPERUSER only)
- */
 router.delete('/user/:userId/all', requireSuperuser, async (req: Request, res: Response) => {
   try {
-    // Prevent revoking own sessions
     if (req.params.userId === req.user!.userId) {
       res.status(400).json({ error: 'Cannot revoke your own sessions' });
       return;

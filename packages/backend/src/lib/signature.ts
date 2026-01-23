@@ -1,9 +1,5 @@
 import crypto from 'crypto';
 
-/**
- * DOWNLOAD_SECRET must be configured in environment
- * Never use a default/fallback value - fail fast if not configured
- */
 if (!process.env.DOWNLOAD_SECRET) {
   throw new Error(
     'DOWNLOAD_SECRET environment variable is required for signed download URLs. ' +
@@ -19,14 +15,10 @@ export interface SignedUrlParams {
   version: string;
 }
 
-/**
- * Generate a signed download URL for a specific user, platform, and version
- * The URL expires after the specified duration (default 30 minutes)
- */
 export function generateSignedDownloadUrl(
   params: SignedUrlParams,
   baseUrl: string,
-  expiresInMs: number = 30 * 60 * 1000 // 30 minutes default
+  expiresInMs: number = 30 * 60 * 1000
 ): string {
   const { userId, platform, version } = params;
   const expires = Date.now() + expiresInMs;
@@ -45,10 +37,6 @@ export function generateSignedDownloadUrl(
   return url.toString();
 }
 
-/**
- * Verify a signed download URL
- * Returns true if the signature is valid and not expired
- */
 export function verifySignedDownload(
   userId: string,
   platform: string,
@@ -58,24 +46,20 @@ export function verifySignedDownload(
 ): { valid: boolean; error?: string } {
   const expiresNum = parseInt(expires, 10);
 
-  // Check if expires is a valid number
   if (isNaN(expiresNum)) {
     return { valid: false, error: 'Invalid expiration timestamp' };
   }
 
-  // Check expiration
   if (Date.now() > expiresNum) {
     return { valid: false, error: 'Download link has expired' };
   }
 
-  // Verify signature
   const data = `${userId}:${platform}:${version}:${expires}`;
   const expectedSignature = crypto
     .createHmac('sha256', DOWNLOAD_SECRET)
     .update(data)
     .digest('hex');
 
-  // Use timing-safe comparison to prevent timing attacks
   const signatureBuffer = Buffer.from(signature);
   const expectedBuffer = Buffer.from(expectedSignature);
 
@@ -92,9 +76,6 @@ export function verifySignedDownload(
   return { valid: true };
 }
 
-/**
- * Get the GitHub release download URL for a specific platform and version
- */
 export function getGitHubReleaseUrl(platform: string, version: string): string {
   const baseUrl = process.env.GITHUB_RELEASES_BASE_URL ||
     'https://github.com/dlopezmartinez/pr-manager/releases/download';
@@ -114,9 +95,6 @@ export function getGitHubReleaseUrl(platform: string, version: string): string {
   return `${baseUrl}/v${version}/${fileName}`;
 }
 
-/**
- * Generate all signed download URLs for a user and version
- */
 export function generateAllSignedUrls(
   userId: string,
   version: string,

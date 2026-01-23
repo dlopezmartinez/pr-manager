@@ -1,16 +1,5 @@
-/**
- * Preload script - Secure bridge between main and renderer process
- * Exposes only necessary Electron APIs via contextBridge
- *
- * This allows contextIsolation to be enabled for security while still
- * providing controlled access to Electron APIs
- */
-
 import { contextBridge, ipcRenderer, webFrame } from 'electron';
 
-/**
- * Token validation result type (matches main process)
- */
 export interface TokenValidationResult {
   valid: boolean;
   scopes: string[];
@@ -19,20 +8,9 @@ export interface TokenValidationResult {
   error?: string;
 }
 
-/**
- * Expose safe Electron API to renderer process
- * Available as window.electronAPI in renderer
- */
 contextBridge.exposeInMainWorld('electronAPI', {
-  /**
-   * IPC communication with main process
-   */
   ipc: {
-    /**
-     * Send one-way message to main process
-     */
     send: (channel: string, ...args: unknown[]) => {
-      // Whitelist allowed channels for security
       const validChannels = [
         'hide-window',
         'update-pr-count',
@@ -48,17 +26,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }
     },
 
-    /**
-     * Listen for messages from main process
-     */
     on: (channel: string, callback: (...args: unknown[]) => void) => {
-      // Whitelist allowed channels for security
       const validChannels = [
         'notification-fallback',
       ];
 
       if (validChannels.includes(channel)) {
-        // Remove any existing listener to prevent duplicates
         ipcRenderer.removeAllListeners(channel);
         ipcRenderer.on(channel, (_, ...args) => callback(...args));
       } else {
@@ -66,9 +39,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       }
     },
 
-    /**
-     * Remove listener for a channel
-     */
     removeListener: (channel: string) => {
       const validChannels = [
         'notification-fallback',
@@ -80,10 +50,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
-  /**
-   * Shell operations (opening external URLs)
-   * Uses IPC to main process for sandbox compatibility
-   */
   shell: {
     openExternal: (url: string): Promise<void> => {
       ipcRenderer.send('open-external', url);
@@ -91,10 +57,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
-  /**
-   * Secure storage for sensitive data (API keys, tokens)
-   * Uses OS-level encryption (Keychain on macOS, DPAPI on Windows)
-   */
   secureStorage: {
     get: (key: string): Promise<string | null> => {
       return ipcRenderer.invoke('secure-storage:get', key);
@@ -110,10 +72,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
-  /**
-   * Token validation
-   * Validates GitHub/GitLab tokens and checks required scopes
-   */
   validateToken: (
     provider: 'github' | 'gitlab',
     token: string,
@@ -122,9 +80,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('validate-token', provider, token, baseUrl);
   },
 
-  /**
-   * Zoom controls
-   */
   zoom: {
     setZoomLevel: (level: number) => webFrame.setZoomLevel(level),
     getZoomLevel: () => webFrame.getZoomLevel(),
@@ -132,24 +87,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getZoomFactor: () => webFrame.getZoomFactor(),
   },
 
-  /**
-   * Environment information
-   */
   platform: process.platform,
   isElectron: true,
 
-  /**
-   * App information
-   */
   getAppVersion: (): Promise<string> => {
     return ipcRenderer.invoke('get-app-version');
   },
 
-  /**
-   * PR Manager Account Authentication
-   * Manages JWT tokens for subscription-based access
-   * Supports dual-token system: accessToken (short-lived) + refreshToken (long-lived)
-   */
   auth: {
     getToken: (): Promise<string | null> => {
       return ipcRenderer.invoke('auth:get-token');
@@ -178,19 +122,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 });
 
-/**
- * User type for auth
- */
 export interface AuthUser {
   id: string;
   email: string;
   name?: string;
 }
 
-/**
- * TypeScript declarations for window.electronAPI
- * This should match the API exposed above
- */
 export interface ElectronAPI {
   ipc: {
     send: (channel: string, ...args: unknown[]) => void;

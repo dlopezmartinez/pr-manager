@@ -13,7 +13,6 @@
         </div>
 
         <div class="view-actions">
-          <!-- Reorder buttons -->
           <button
             class="action-btn"
             @click="moveViewUp(view, index)"
@@ -31,7 +30,6 @@
             <ChevronDown :size="14" :stroke-width="2" />
           </button>
 
-          <!-- Edit/Delete for custom views -->
           <template v-if="!view.readonly">
             <button
               class="action-btn"
@@ -117,7 +115,6 @@ function moveViewUp(view: ViewConfig, currentIndex: number): void {
   const views = sortedViews.value;
   const previousView = views[currentIndex - 1];
 
-  // Simply swap the index positions as order values
   updateView(view.id, { order: currentIndex - 1 });
   updateView(previousView.id, { order: currentIndex });
 }
@@ -128,7 +125,6 @@ function moveViewDown(view: ViewConfig, currentIndex: number): void {
 
   const nextView = views[currentIndex + 1];
 
-  // Simply swap the index positions as order values
   updateView(view.id, { order: currentIndex + 1 });
   updateView(nextView.id, { order: currentIndex });
 }
@@ -296,7 +292,6 @@ function handleDelete(): void {
   color: var(--color-accent-primary);
 }
 
-/* Confirm Dialog */
 .confirm-overlay {
   position: fixed;
   top: 0;
@@ -310,7 +305,6 @@ function handleDelete(): void {
   z-index: 2000;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  /* GPU acceleration to prevent flickering */
   will-change: opacity;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;

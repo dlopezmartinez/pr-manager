@@ -128,7 +128,6 @@ const statusLabel = computed(() => {
   letter-spacing: 0.3px;
 }
 
-/* Success state */
 .check-item.status-success {
   background: var(--color-success-bg);
 }
@@ -142,7 +141,6 @@ const statusLabel = computed(() => {
   color: white;
 }
 
-/* Failure state */
 .check-item.status-failure {
   background: var(--color-error-bg);
 }
@@ -156,7 +154,6 @@ const statusLabel = computed(() => {
   color: white;
 }
 
-/* Pending state */
 .check-item.status-pending {
   background: var(--color-warning-bg);
 }
@@ -170,7 +167,6 @@ const statusLabel = computed(() => {
   color: white;
 }
 
-/* Cancelled state */
 .check-item.status-cancelled {
   background: var(--color-surface-secondary);
 }
@@ -184,7 +180,6 @@ const statusLabel = computed(() => {
   color: white;
 }
 
-/* Skipped state */
 .check-item.status-skipped {
   background: var(--color-surface-secondary);
 }

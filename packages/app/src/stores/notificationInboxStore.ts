@@ -1,14 +1,5 @@
-/**
- * Notification Inbox Store
- * Manages notifications for followed PRs that have changes
- * Persists to localStorage with automatic pruning
- */
-
 import { reactive, watch, computed } from 'vue';
 
-/**
- * Types of changes that can trigger a notification
- */
 export type NotificationChangeType =
   | 'new_commits'
   | 'new_comments'
@@ -17,9 +8,6 @@ export type NotificationChangeType =
   | 'pr_closed'
   | 'pr_merged';
 
-/**
- * A single notification in the inbox
- */
 export interface InboxNotification {
   id: string;
   prId: string;
@@ -35,7 +23,7 @@ export interface InboxNotification {
     after?: number;
     count?: number;
   };
-  createdAt: string; // ISO timestamp
+  createdAt: string;
   read: boolean;
 }
 
@@ -46,7 +34,7 @@ interface NotificationInboxStoreData {
 
 const STORAGE_KEY = 'pr-manager-notification-inbox';
 const MAX_NOTIFICATIONS = 100;
-const PRUNE_AGE_DAYS = 7; // Keep notifications for 7 days
+const PRUNE_AGE_DAYS = 7;
 const SAVE_DEBOUNCE_MS = 500;
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -97,9 +85,7 @@ function pruneOldNotifications(data: NotificationInboxStoreData): void {
     return createdDate >= cutoffDate;
   });
 
-  // Also enforce max limit
   if (data.notifications.length > MAX_NOTIFICATIONS) {
-    // Keep most recent notifications
     data.notifications = data.notifications
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, MAX_NOTIFICATIONS);
@@ -113,10 +99,8 @@ function pruneOldNotifications(data: NotificationInboxStoreData): void {
   data.lastPruned = now.toISOString();
 }
 
-// Initialize store
 const storeData = reactive<NotificationInboxStoreData>(loadNotificationInboxState());
 
-// Prune on startup if needed (once per day)
 const lastPruned = new Date(storeData.lastPruned);
 const now = new Date();
 if (now.getTime() - lastPruned.getTime() > 24 * 60 * 60 * 1000) {
@@ -124,7 +108,6 @@ if (now.getTime() - lastPruned.getTime() > 24 * 60 * 60 * 1000) {
   saveNotificationInboxState(storeData);
 }
 
-// Auto-save on changes
 watch(
   () => ({ ...storeData }),
   (newData) => {
@@ -133,11 +116,6 @@ watch(
   { deep: true }
 );
 
-// ===== Public API =====
-
-/**
- * Add a new notification to the inbox
- */
 export function addNotification(
   notification: Omit<InboxNotification, 'id' | 'createdAt' | 'read'>
 ): InboxNotification {
@@ -150,13 +128,11 @@ export function addNotification(
 
   console.log('NotificationInboxStore: Adding notification:', newNotification.id, newNotification.type);
 
-  // Add to the beginning (most recent first)
   storeData.notifications.unshift(newNotification);
 
   console.log('NotificationInboxStore: Total notifications now:', storeData.notifications.length);
   console.log('NotificationInboxStore: Unread notifications:', storeData.notifications.filter(n => !n.read).length);
 
-  // Enforce limit
   if (storeData.notifications.length > MAX_NOTIFICATIONS) {
     storeData.notifications = storeData.notifications.slice(0, MAX_NOTIFICATIONS);
   }
@@ -164,9 +140,6 @@ export function addNotification(
   return newNotification;
 }
 
-/**
- * Add multiple notifications for the same PR (e.g., commits + comments)
- */
 export function addBatchNotifications(
   prInfo: {
     prId: string;
@@ -212,9 +185,6 @@ export function addBatchNotifications(
   return added;
 }
 
-/**
- * Mark a notification as read
- */
 export function markAsRead(notificationId: string): void {
   const notification = storeData.notifications.find(n => n.id === notificationId);
   if (notification) {
@@ -222,18 +192,12 @@ export function markAsRead(notificationId: string): void {
   }
 }
 
-/**
- * Mark all notifications as read
- */
 export function markAllAsRead(): void {
   for (const notification of storeData.notifications) {
     notification.read = true;
   }
 }
 
-/**
- * Mark all notifications for a specific PR as read
- */
 export function markPRNotificationsAsRead(prId: string): void {
   for (const notification of storeData.notifications) {
     if (notification.prId === prId) {
@@ -242,9 +206,6 @@ export function markPRNotificationsAsRead(prId: string): void {
   }
 }
 
-/**
- * Delete a notification
- */
 export function deleteNotification(notificationId: string): void {
   const index = storeData.notifications.findIndex(n => n.id === notificationId);
   if (index !== -1) {
@@ -252,37 +213,22 @@ export function deleteNotification(notificationId: string): void {
   }
 }
 
-/**
- * Delete all notifications for a specific PR
- */
 export function deletePRNotifications(prId: string): void {
   storeData.notifications = storeData.notifications.filter(n => n.prId !== prId);
 }
 
-/**
- * Get all notifications
- */
 export function getAllNotifications(): InboxNotification[] {
   return storeData.notifications;
 }
 
-/**
- * Get unread notifications
- */
 export function getUnreadNotifications(): InboxNotification[] {
   return storeData.notifications.filter(n => !n.read);
 }
 
-/**
- * Get notifications for a specific PR
- */
 export function getPRNotifications(prId: string): InboxNotification[] {
   return storeData.notifications.filter(n => n.prId === prId);
 }
 
-/**
- * Get notifications grouped by PR
- */
 export function getNotificationsGroupedByPR(): Map<string, InboxNotification[]> {
   const grouped = new Map<string, InboxNotification[]>();
 
@@ -295,23 +241,14 @@ export function getNotificationsGroupedByPR(): Map<string, InboxNotification[]> 
   return grouped;
 }
 
-/**
- * Get unread count
- */
 export function getUnreadCount(): number {
   return storeData.notifications.filter(n => !n.read).length;
 }
 
-/**
- * Clear all notifications
- */
 export function clearAllNotifications(): void {
   storeData.notifications = [];
 }
 
-/**
- * Get notification type display text
- */
 export function getNotificationTypeText(type: NotificationChangeType, count?: number): string {
   switch (type) {
     case 'new_commits':
@@ -331,39 +268,20 @@ export function getNotificationTypeText(type: NotificationChangeType, count?: nu
   }
 }
 
-/**
- * Computed: reactive unread count
- */
 export const unreadCount = computed(() =>
   storeData.notifications.filter(n => !n.read).length
 );
 
-/**
- * Computed: reactive total notification count
- */
 export const totalCount = computed(() => storeData.notifications.length);
 
-/**
- * Computed: reactive notifications list
- */
 export const notificationsList = computed(() => storeData.notifications);
 
-/**
- * Computed: reactive unread notifications list
- */
 export const unreadNotificationsList = computed(() =>
   storeData.notifications.filter(n => !n.read)
 );
 
-/**
- * Computed: check if there are any notifications
- */
 export const hasNotifications = computed(() => storeData.notifications.length > 0);
 
-/**
- * Computed: check if there are unread notifications
- */
 export const hasUnread = computed(() => storeData.notifications.some(n => !n.read));
 
-// Export store for direct access if needed
 export const notificationInboxStore = storeData;

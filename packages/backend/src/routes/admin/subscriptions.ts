@@ -8,10 +8,6 @@ import { getQueryNumber, toStr } from '../../utils/queryParams.js';
 
 const router = Router();
 
-/**
- * GET /admin/subscriptions
- * List all subscriptions with pagination
- */
 router.get('/', async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, getQueryNumber(req.query.page) || 1);
@@ -20,7 +16,6 @@ router.get('/', async (req: Request, res: Response) => {
 
     const where: any = {};
 
-    // Filter by status
     if (req.query.status) {
       where.status = String(req.query.status);
     }
@@ -63,10 +58,6 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * GET /admin/subscriptions/:id
- * Get subscription details
- */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const subscription = await prisma.subscription.findUnique({
@@ -101,10 +92,6 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-/**
- * PATCH /admin/subscriptions/:id/status
- * Update subscription status (SUPERUSER only)
- */
 router.patch(
   '/:id/status',
   requireSuperuser,

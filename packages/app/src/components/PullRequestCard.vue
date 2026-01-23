@@ -9,7 +9,6 @@
     tabindex="0"
     @keydown.enter="handleCardClick"
   >
-    <!-- Unseen Badge -->
     <UnseenBadge
       v-if="!isSeen(pr.id)"
       class="unseen-indicator"
@@ -23,7 +22,6 @@
         <span class="pr-number">#{{ pr.number }}</span>
       </div>
       <div class="header-right">
-        <!-- Quick Actions Bar - visible on hover -->
         <QuickActionsBar
           v-if="showQuickActions && pr.state === 'OPEN'"
           class="quick-actions"
@@ -66,7 +64,6 @@
       </div>
 
       <div class="meta-items">
-        <!-- Follow-up toggle -->
         <span
           class="meta-item follow-up"
           :class="{ 'is-following': isFollowingPR }"
@@ -76,7 +73,6 @@
           <component :is="isFollowingPR ? Bell : BellOff" :size="14" :stroke-width="2" class="icon" />
         </span>
 
-        <!-- PR Details toggle -->
         <span
           class="meta-item details"
           title="Show details"
@@ -110,22 +106,18 @@
       </div>
     </div>
 
-    <!-- PR Details Expansion -->
     <div v-if="isDetailsExpanded" class="details-expansion" @click.stop>
       <div class="details-grid">
-        <!-- Diff Stats -->
         <div v-if="diffStats" class="detail-item">
           <BarChart3 :size="14" :stroke-width="2" class="detail-icon" />
           <span class="detail-text">{{ diffStats }}</span>
         </div>
 
-        <!-- Branch Info -->
         <div v-if="branchInfo" class="detail-item">
           <GitMerge :size="14" :stroke-width="2" class="detail-icon" />
           <span class="detail-text branch-info">{{ branchInfo }}</span>
         </div>
 
-        <!-- Reviewers -->
         <div v-if="reviewersList.length > 0" class="detail-item reviewers-item">
           <Users :size="14" :stroke-width="2" class="detail-icon" />
           <div class="reviewers-list">
@@ -142,7 +134,6 @@
           </div>
         </div>
 
-        <!-- Updated -->
         <div class="detail-item">
           <Clock :size="14" :stroke-width="2" class="detail-icon" />
           <span class="detail-text">Updated {{ updatedAgo }}</span>
@@ -182,7 +173,6 @@
       </div>
     </div>
 
-    <!-- Quick Comment Expansion -->
     <div v-if="showCommentExpansion" class="comment-expansion" @click.stop>
       <div class="comment-header">
         <span class="comment-title">{{ commentActionTitle }}</span>
@@ -276,7 +266,6 @@ const props = withDefaults(defineProps<Props>(), {
   showQuickActions: true
 });
 
-// Extract for template usage
 const showComments = computed(() => props.showComments);
 const showChecks = computed(() => props.showChecks);
 const allowCommentsExpansion = computed(() => props.allowCommentsExpansion);
@@ -291,7 +280,6 @@ const emit = defineEmits<{
   (e: 'action-completed', pr: PullRequestBasic, action: string): void;
 }>();
 
-// Quick Actions
 const {
   loading: actionLoading,
   approve,
@@ -301,7 +289,6 @@ const {
   canRequestChanges: canRequestChangesCheck,
 } = useQuickActions();
 
-// State
 const isExpanded = ref(false);
 const isCommentsExpanded = ref(false);
 const isDetailsExpanded = ref(false);
@@ -310,7 +297,6 @@ const commentModalType = ref<'approve' | 'request-changes' | 'comment'>('comment
 const commentText = ref('');
 const commentTextarea = ref<HTMLTextAreaElement | null>(null);
 
-// Computed
 const checksContexts = computed(() => {
   return props.pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes;
 });
@@ -354,7 +340,6 @@ const loadingComments = computed(() => {
 const canApprove = computed(() => canApproveCheck(props.pr));
 const canRequestChanges = computed(() => canRequestChangesCheck(props.pr));
 
-// Follow-up state
 const isFollowingPR = computed(() => isFollowing(props.pr.id));
 const followUpTitle = computed(() => {
   if (isFollowingPR.value) {
@@ -363,7 +348,6 @@ const followUpTitle = computed(() => {
   return canFollowMore() ? 'Follow this PR for updates' : 'Maximum followed PRs reached';
 });
 
-// Details computed properties
 const diffStats = computed(() => {
   const pr = props.pr as any;
   if (pr.additions === undefined && pr.deletions === undefined) return null;
@@ -395,10 +379,8 @@ interface ReviewerInfo {
   state: string;
 }
 
-// Memoization cache for reviewersList computation
 let lastReviewersResult: { prId: string; reviewers: ReviewerInfo[] } | null = null;
 
-// Review state priority: higher number = more important/final
 function getReviewStatePriority(state: string): number {
   switch (state) {
     case 'APPROVED': return 4;
@@ -413,17 +395,12 @@ function getReviewStatePriority(state: string): number {
 const reviewersList = computed((): ReviewerInfo[] => {
   const pr = props.pr;
 
-  // Check if we can use cached result (same PR)
   if (lastReviewersResult?.prId === pr.id) {
     return lastReviewersResult.reviewers;
   }
 
-  // Map to track the best/latest state for each reviewer
   const reviewerStates = new Map<string, string>();
 
-  // Process reviews first - keep the highest priority state for each reviewer
-  // Reviews are returned in chronological order, so later reviews override earlier ones
-  // But we also consider priority (APPROVED > CHANGES_REQUESTED > COMMENTED > PENDING)
   if ((pr as any).reviews?.nodes) {
     for (const review of (pr as any).reviews.nodes) {
       const login = review.author?.login;
@@ -435,12 +412,9 @@ const reviewersList = computed((): ReviewerInfo[] => {
         if (!existingState) {
           reviewerStates.set(login, state);
         } else {
-          // Keep the higher priority state, or update if same priority (more recent)
           const existingPriority = getReviewStatePriority(existingState);
           const newPriority = getReviewStatePriority(state);
 
-          // APPROVED and CHANGES_REQUESTED are "final" states - prefer the most recent one
-          // For other states, always take the higher priority
           if (newPriority >= existingPriority) {
             reviewerStates.set(login, state);
           }
@@ -449,7 +423,6 @@ const reviewersList = computed((): ReviewerInfo[] => {
     }
   }
 
-  // Now add pending reviewers (those in reviewRequests who haven't reviewed yet)
   if (pr.reviewRequests?.nodes) {
     for (const request of pr.reviewRequests.nodes) {
       const reviewer = request.requestedReviewer;
@@ -515,7 +488,6 @@ function handleCardClick(event: MouseEvent) {
     return;
   }
 
-  // Navigate to PR in browser
   markAsSeen(props.pr.id);
   openExternal(props.pr.url).catch((err) => {
     console.error('Failed to open PR URL:', err);
@@ -593,7 +565,6 @@ function getCheckStatusTitle(state: string) {
 }
 
 function handleMouseEnter() {
-  // Emit prefetch event to parent - only if we have items to prefetch
   const hasComments = commentsCount.value > 0 && !commentsList.value;
   const hasChecks = !!props.pr.commits?.nodes?.[0]?.commit?.statusCheckRollup && !checksContexts.value;
 
@@ -606,7 +577,6 @@ function handleMouseLeave() {
   emit('prefetch-cancel');
 }
 
-// Computed for comment expansion
 const commentActionTitle = computed(() => {
   switch (commentModalType.value) {
     case 'approve':
@@ -659,7 +629,6 @@ const commentActionClass = computed(() => {
   }
 });
 
-// Quick Action handlers
 function handleApprove() {
   commentModalType.value = 'approve';
   commentText.value = '';
@@ -706,7 +675,6 @@ function closeCommentExpansion() {
 async function handleCommentSubmitClick() {
   const comment = commentText.value.trim();
 
-  // Validate required comment for request changes
   if (commentModalType.value === 'request-changes' && !comment) {
     return;
   }
@@ -762,7 +730,6 @@ async function handleCommentSubmitClick() {
   transform: scale(0.99);
 }
 
-/* Disable animations when expanded to prevent layout shifts */
 .pr-card.is-expanded:hover {
   transform: none;
 }
@@ -771,14 +738,12 @@ async function handleCommentSubmitClick() {
   transform: none;
 }
 
-/* Unseen indicator positioning */
 .unseen-indicator {
   position: absolute;
   top: 12px;
   left: 12px;
 }
 
-/* Show quick actions - always slightly visible */
 .quick-actions {
   opacity: 0.4;
   pointer-events: auto;
@@ -884,7 +849,6 @@ h3 {
   color: var(--color-accent-primary);
 }
 
-/* Follow-up button */
 .meta-item.follow-up {
   opacity: 0.6;
   transition: opacity var(--transition-fast), background-color var(--transition-fast);
@@ -903,7 +867,6 @@ h3 {
   color: var(--color-accent-primary);
 }
 
-/* Checks status colors */
 .meta-item.checks.status-success {
   background: var(--color-success-bg);
 }
@@ -956,7 +919,6 @@ h3 {
   transform: rotate(180deg);
 }
 
-/* Details Expansion */
 .details-expansion {
   margin-top: var(--spacing-md);
   padding: var(--spacing-md);
@@ -1132,7 +1094,6 @@ h3 {
   color: var(--color-warning);
 }
 
-/* Comment Expansion */
 .comment-expansion {
   margin-top: var(--spacing-md);
   padding: var(--spacing-md);
