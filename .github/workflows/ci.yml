@@ -73,7 +73,6 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_INITDB_ARGS: "-c password_encryption=scram-sha-256"
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: pr_manager_test
@@ -149,7 +148,6 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_INITDB_ARGS: "-c password_encryption=scram-sha-256"
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: pr_manager_test
