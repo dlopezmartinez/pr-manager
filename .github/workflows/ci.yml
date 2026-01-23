@@ -199,6 +199,8 @@ jobs:
         run: npm run e2e
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pr_manager_test?schema=public
+          JWT_SECRET: test-jwt-secret-for-e2e-testing
+          DOWNLOAD_SECRET: test-download-secret-for-e2e-testing
           NODE_ENV: test
           CI: true
 

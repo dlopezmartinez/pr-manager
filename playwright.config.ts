@@ -24,7 +24,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -43,9 +43,10 @@ export default defineConfig({
       timeout: 120000,
       reuseExistingServer: !process.env.CI,
       env: {
-        NODE_ENV: 'development',
+        NODE_ENV: 'test',
         DATABASE_URL: process.env.DATABASE_URL || 'postgresql://user:pass@localhost:5432/prmanager',
-        JWT_SECRET: 'test-jwt-secret-for-e2e',
+        JWT_SECRET: process.env.JWT_SECRET || 'test-jwt-secret-for-e2e',
+        DOWNLOAD_SECRET: process.env.DOWNLOAD_SECRET || 'test-download-secret-for-e2e',
       },
     },
   ],
