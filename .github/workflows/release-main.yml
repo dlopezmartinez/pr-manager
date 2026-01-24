@@ -1,0 +1,313 @@
+name: "Release Main"
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  # =============================================================================
+  # Detect what packages changed
+  # =============================================================================
+  detect-changes:
+    name: "Detect Changes"
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      landing: ${{ steps.filter.outputs.landing }}
+      backend: ${{ steps.filter.outputs.backend }}
+      sha: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          base: HEAD~1
+          filters: |
+            app:
+              - 'packages/app/**'
+            landing:
+              - 'packages/landing/**'
+            backend:
+              - 'packages/backend/**'
+
+  # =============================================================================
+  # Create minor release
+  # =============================================================================
+  minor-release:
+    name: "Create Minor Release"
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.new_version.outputs.version }}
+      artifact_sha: ${{ needs.detect-changes.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "Setup Git"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: "Get current version"
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: "Calculate minor version bump"
+        id: new_version
+        run: |
+          CURRENT="${{ steps.current_version.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW_MINOR=$((MINOR + 1))
+          NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Version bump: $CURRENT → $NEW_VERSION"
+
+      - name: "Update package.json versions"
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+
+          npm version $NEW_VERSION --no-git-tag-version
+
+          cd packages/app
+          npm version $NEW_VERSION --no-git-tag-version
+          cd ../..
+
+          cd packages/backend
+          npm version $NEW_VERSION --no-git-tag-version
+          cd ../..
+
+          cd packages/landing
+          npm version $NEW_VERSION --no-git-tag-version
+          cd ../..
+
+          echo "All package versions synchronized to v$NEW_VERSION"
+
+      - name: "Generate changelog"
+        id: changelog
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "Last tag: ${LAST_TAG:-'(none)'}"
+
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -v "^- chore(release)" | head -50)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges -20)
+          fi
+
+          FEATURES=$(echo "$COMMITS" | grep -E "^- feat" || true)
+          FIXES=$(echo "$COMMITS" | grep -E "^- fix" || true)
+          OTHER=$(echo "$COMMITS" | grep -vE "^- (feat|fix)" || true)
+
+          {
+            echo "changelog<<EOF"
+            if [ -n "$FEATURES" ]; then
+              echo "### New Features"
+              echo "$FEATURES"
+              echo ""
+            fi
+            if [ -n "$FIXES" ]; then
+              echo "### Bug Fixes"
+              echo "$FIXES"
+              echo ""
+            fi
+            if [ -n "$OTHER" ]; then
+              echo "### Other Changes"
+              echo "$OTHER"
+              echo ""
+            fi
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: "Commit version bump"
+        run: |
+          git add package.json package-lock.json \
+            packages/app/package.json \
+            packages/backend/package.json \
+            packages/landing/package.json
+          git commit -m "chore(release): v${{ steps.new_version.outputs.version }}"
+          git push origin main
+          echo "Committed version bump"
+
+      - name: "Create and push tag"
+        run: |
+          git tag -a "v${{ steps.new_version.outputs.version }}" -m "Minor Release v${{ steps.new_version.outputs.version }}"
+          git push origin "v${{ steps.new_version.outputs.version }}"
+          echo "Created tag v${{ steps.new_version.outputs.version }}"
+
+      - name: "Create GitHub Release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.new_version.outputs.version }}
+          name: "v${{ steps.new_version.outputs.version }}"
+          body: |
+            ## Minor Release v${{ steps.new_version.outputs.version }}
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
+
+            ### What's being released
+
+            | Package | Status |
+            |---------|--------|
+            | App | ${{ needs.detect-changes.outputs.app == 'true' && '✅ Uploading binaries' || '⏭️ No changes' }} |
+            | Landing | ${{ needs.detect-changes.outputs.landing == 'true' && '✅ Deploying' || '⏭️ No changes' }} |
+            | Backend | ${{ needs.detect-changes.outputs.backend == 'true' && '✅ Deploying' || '⏭️ No changes' }} |
+
+            ---
+
+            ### Downloads
+
+            | Platform | File |
+            |----------|------|
+            | macOS | `PR-Manager-${{ steps.new_version.outputs.version }}.dmg` |
+            | Windows | `PRManager-${{ steps.new_version.outputs.version }}-Setup.exe` |
+            | Linux | `pr-manager_${{ steps.new_version.outputs.version }}_amd64.deb` / `.rpm` |
+
+            ---
+
+            *Minor release created automatically on push to main*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "Sync develop with main"
+        run: |
+          git fetch origin develop
+          git checkout develop
+          git merge main --no-edit -m "chore: sync develop with v${{ steps.new_version.outputs.version }}"
+          git push origin develop
+          echo "Synced develop with main"
+
+  # =============================================================================
+  # Upload app artifacts (only if app changed)
+  # =============================================================================
+  upload-macos:
+    name: "Upload macOS"
+    needs: [detect-changes, minor-release]
+    if: needs.detect-changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Download macOS artifact"
+        id: download
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: app.yml
+          commit: ${{ needs.minor-release.outputs.artifact_sha }}
+          name: app-macos-${{ needs.minor-release.outputs.artifact_sha }}
+          path: artifacts
+          if_no_artifact_found: warn
+
+      - name: "Upload to release"
+        if: steps.download.outputs.found_artifact == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.minor-release.outputs.version }}
+          files: |
+            artifacts/*.dmg
+            artifacts/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  upload-windows:
+    name: "Upload Windows"
+    needs: [detect-changes, minor-release]
+    if: needs.detect-changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Download Windows artifact"
+        id: download
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: app.yml
+          commit: ${{ needs.minor-release.outputs.artifact_sha }}
+          name: app-windows-${{ needs.minor-release.outputs.artifact_sha }}
+          path: artifacts
+          if_no_artifact_found: warn
+
+      - name: "Upload to release"
+        if: steps.download.outputs.found_artifact == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.minor-release.outputs.version }}
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.nupkg
+            artifacts/**/RELEASES
+            artifacts/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  upload-linux:
+    name: "Upload Linux"
+    needs: [detect-changes, minor-release]
+    if: needs.detect-changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Download Linux artifact"
+        id: download
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: app.yml
+          commit: ${{ needs.minor-release.outputs.artifact_sha }}
+          name: app-linux-${{ needs.minor-release.outputs.artifact_sha }}
+          path: artifacts
+          if_no_artifact_found: warn
+
+      - name: "Upload to release"
+        if: steps.download.outputs.found_artifact == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.minor-release.outputs.version }}
+          files: |
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+            artifacts/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  # =============================================================================
+  # Deploy landing (only if landing changed)
+  # =============================================================================
+  deploy-landing:
+    name: "Deploy Landing"
+    needs: [detect-changes, minor-release]
+    if: needs.detect-changes.outputs.landing == 'true'
+    uses: ./.github/workflows/deploy-landing.yml
+    with:
+      artifact_sha: ${{ needs.detect-changes.outputs.sha }}
+    secrets: inherit
+
+  # =============================================================================
+  # Deploy backend (only if backend changed)
+  # =============================================================================
+  deploy-backend:
+    name: "Deploy Backend"
+    needs: [detect-changes, minor-release]
+    if: needs.detect-changes.outputs.backend == 'true'
+    uses: ./.github/workflows/deploy-backend.yml
+    with:
+      artifact_sha: ${{ needs.detect-changes.outputs.sha }}
+    secrets: inherit

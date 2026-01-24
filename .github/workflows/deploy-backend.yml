@@ -1,0 +1,53 @@
+name: "Deploy Backend"
+
+on:
+  workflow_call:
+    inputs:
+      artifact_sha:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      artifact_sha:
+        description: 'Commit SHA for artifact'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  deploy:
+    name: "Deploy to Railway"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Download backend artifact"
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: backend.yml
+          commit: ${{ inputs.artifact_sha }}
+          name: backend-${{ inputs.artifact_sha }}
+          path: packages/backend
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: "Install Railway CLI"
+        run: npm install -g @railway/cli
+
+      - name: "Deploy to Railway"
+        run: |
+          cd packages/backend
+          railway up --service pr-manager-backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: 7508618e-d289-424d-bb95-f2cc0a51b6fc
+
+      - name: "Deployment status"
+        run: |
+          echo "✅ Backend deployed successfully!"
+          echo "🌐 https://api.prmanager.app"
+          echo "📦 Deployed artifact: backend-${{ inputs.artifact_sha }}"
