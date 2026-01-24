@@ -8,20 +8,33 @@ process.env.DOWNLOAD_SECRET = 'test-download-secret';
 process.env.LEMONSQUEEZY_WEBHOOK_SECRET = 'test-webhook-secret-for-testing';
 process.env.LEMONSQUEEZY_API_KEY = 'test_api_key';
 
-// CRITICAL: Force test database to prevent accidental production data loss
-const REQUIRED_TEST_DB = 'pr_manager_test';
+// CRITICAL: Validate database URL to prevent accidental production data loss
 const currentDbUrl = process.env.DATABASE_URL || '';
+const PRODUCTION_INDICATORS = ['railway', 'production', 'prod.', 'neon.tech', 'supabase.co'];
+const TEST_DB_INDICATORS = ['test', 'pr_manager_test'];
 
 // Safety check: Never run tests against production database
-if (currentDbUrl.includes('railway') || currentDbUrl.includes('production')) {
+const isProductionUrl = PRODUCTION_INDICATORS.some(indicator =>
+  currentDbUrl.toLowerCase().includes(indicator)
+);
+
+if (isProductionUrl) {
   console.error('\n🚨 CRITICAL: Refusing to run tests against production database!');
-  console.error('   DATABASE_URL contains "railway" or "production"');
+  console.error(`   DATABASE_URL contains production indicator`);
   console.error('   Please use a local test database.\n');
   process.exit(1);
 }
 
-// Force test database URL
-process.env.DATABASE_URL = `postgresql://postgres:postgres@localhost:5432/${REQUIRED_TEST_DB}`;
+// Check if current URL is already a valid test database
+const isValidTestUrl = TEST_DB_INDICATORS.some(indicator =>
+  currentDbUrl.toLowerCase().includes(indicator)
+);
+
+// Only override if no valid test URL is provided
+if (!isValidTestUrl) {
+  console.log('⚠️  No test database URL detected, using default local test database');
+  process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/pr_manager_test';
+}
 
 beforeAll(async () => {
   // Ensure database connection
