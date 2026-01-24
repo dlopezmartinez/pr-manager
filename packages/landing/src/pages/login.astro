@@ -81,6 +81,14 @@ import Footer from '../components/Footer.astro';
 <script>
   const API_URL = 'https://api.prmanager.app';
 
+  // Fallback messages for network/unknown errors
+  const FALLBACK_MESSAGES = {
+    network: 'Unable to connect to the server. Please check your internet connection.',
+    rateLimit: 'Too many attempts. Please wait a moment and try again.',
+    server: 'Something went wrong on our end. Please try again later.',
+    default: 'Unable to sign in. Please try again.',
+  };
+
   // Get redirect URL from params (optional)
   const urlParams = new URLSearchParams(window.location.search);
   const redirectTo = urlParams.get('redirect') || '/success';
@@ -113,22 +121,53 @@ import Footer from '../components/Footer.astro';
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Invalid credentials');
+      // Handle rate limiting
+      if (response.status === 429) {
+        showError(FALLBACK_MESSAGES.rateLimit);
+        resetButton();
+        return;
       }
 
-      // Store token in localStorage
-      localStorage.setItem('pr_manager_token', data.token);
+      // Handle server errors
+      if (response.status >= 500) {
+        showError(FALLBACK_MESSAGES.server);
+        resetButton();
+        return;
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        showError(FALLBACK_MESSAGES.server);
+        resetButton();
+        return;
+      }
+
+      if (!response.ok) {
+        // Use message from backend (already user-friendly)
+        showError(data.message || FALLBACK_MESSAGES.default);
+        resetButton();
+        return;
+      }
+
+      // Store tokens in localStorage
+      localStorage.setItem('pr_manager_token', data.accessToken);
+      if (data.refreshToken) {
+        localStorage.setItem('pr_manager_refresh_token', data.refreshToken);
+      }
       localStorage.setItem('pr_manager_user', JSON.stringify(data.user));
 
       // Redirect to the specified URL or success page
       window.location.href = redirectTo;
-    } catch (error: any) {
-      showError(error.message || 'Something went wrong. Please try again.');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Sign In';
+    } catch (error: unknown) {
+      // Network error or fetch failed
+      if (error instanceof TypeError) {
+        showError(FALLBACK_MESSAGES.network);
+      } else {
+        showError(FALLBACK_MESSAGES.default);
+      }
+      resetButton();
     }
   });
 
@@ -139,5 +178,10 @@ import Footer from '../components/Footer.astro';
 
   function hideError() {
     errorMessage.classList.add('hidden');
+  }
+
+  function resetButton() {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Sign In';
   }
 </script>

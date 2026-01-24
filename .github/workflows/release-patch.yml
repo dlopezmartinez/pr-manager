@@ -4,6 +4,16 @@ on:
   pull_request:
     branches: [develop]
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      description:
+        description: "Release description (what changed)"
+        required: true
+        type: string
+      commit_sha:
+        description: "Commit SHA for artifacts (leave empty for latest develop)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -12,14 +22,15 @@ permissions:
 jobs:
   patch-release:
     name: "Create Patch Release"
-    # Only run if PR is merged AND has release:patch label
+    # Run if: PR merged with label OR manual dispatch
     if: |
-      github.event.pull_request.merged == true &&
-      contains(github.event.pull_request.labels.*.name, 'release:patch')
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       contains(github.event.pull_request.labels.*.name, 'release:patch'))
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.new_version.outputs.version }}
-      artifact_sha: ${{ github.event.pull_request.head.sha }}
+      artifact_sha: ${{ steps.artifact_sha.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,6 +46,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: "Determine artifact SHA"
+        id: artifact_sha
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ -n "${{ inputs.commit_sha }}" ]; then
+              SHA="${{ inputs.commit_sha }}"
+            else
+              SHA=$(git rev-parse HEAD)
+            fi
+          else
+            SHA="${{ github.event.pull_request.head.sha }}"
+          fi
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "Artifact SHA: $SHA"
 
       - name: "Get current version"
         id: current_version
@@ -80,17 +106,29 @@ jobs:
       - name: "Generate changelog"
         id: changelog
         run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
-          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            DESCRIPTION="${{ inputs.description }}"
+            {
+              echo "changelog<<EOF"
+              echo "### Changes"
+              echo "- ${DESCRIPTION}"
+              echo ""
+              echo "*Manual release triggered by @${{ github.actor }}*"
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+          else
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            PR_AUTHOR="${{ github.event.pull_request.user.login }}"
 
-          {
-            echo "changelog<<EOF"
-            echo "### Changes"
-            echo "- ${PR_TITLE} (#${PR_NUMBER}) @${PR_AUTHOR}"
-            echo ""
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+            {
+              echo "changelog<<EOF"
+              echo "### Changes"
+              echo "- ${PR_TITLE} (#${PR_NUMBER}) @${PR_AUTHOR}"
+              echo ""
+              echo "EOF"
+            } >> $GITHUB_OUTPUT
+          fi
 
       - name: "Commit version bump"
         run: |
@@ -130,7 +168,7 @@ jobs:
 
             ---
 
-            *Patch release created via `release:patch` label*
+            *Patch release created ${{ github.event_name == 'workflow_dispatch' && 'manually' || 'via `release:patch` label' }}*
           draft: false
           prerelease: false
         env:
