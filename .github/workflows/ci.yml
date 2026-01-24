@@ -188,6 +188,8 @@ jobs:
     name: "🎭 E2E Tests"
     runs-on: ubuntu-latest
     needs: [test-app, test-backend]
+    # Only run E2E tests on main branch to save GitHub Actions minutes
+    if: github.base_ref == 'main' || github.ref == 'refs/heads/main'
     services:
       postgres:
         image: postgres:15
