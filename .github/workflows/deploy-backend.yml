@@ -30,7 +30,6 @@ jobs:
 
       - name: "Deploy to Railway"
         run: railway up --service '@pr-manager/backend'
-        working-directory: packages/backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: 7508618e-d289-424d-bb95-f2cc0a51b6fc
