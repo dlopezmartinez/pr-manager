@@ -307,54 +307,64 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
   # =============================================================================
-  # Copy binaries from previous release (when app didn't change)
+  # Resolve binaries strategy (when app didn't change)
   # =============================================================================
-  copy-binaries:
-    name: "Copy Binaries"
+  resolve-binaries:
+    name: "Resolve Binaries"
     needs: [detect-changes, patch-release]
     if: needs.detect-changes.outputs.app != 'true'
     runs-on: ubuntu-latest
+    outputs:
+      strategy: ${{ steps.resolve.outputs.strategy }}
+      source_tag: ${{ steps.resolve.outputs.source_tag }}
     steps:
-      - name: "Find latest release with assets"
-        id: find_release
+      - name: "Determine binary strategy"
+        id: resolve
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Looking for latest release with binary assets..."
+          echo "Determining binary strategy..."
 
-          # Get releases and find one with assets
+          # 1. Check for previous release with binaries
+          echo "Checking for previous release with binaries..."
           RELEASES=$(gh api repos/${{ github.repository }}/releases --paginate -q '.[].tag_name' | head -20)
 
           for TAG in $RELEASES; do
-            # Skip current release
             if [ "$TAG" == "v${{ needs.patch-release.outputs.version }}" ]; then
               continue
             fi
 
-            # Check if this release has .dmg assets (indicates it has binaries)
-            ASSET_COUNT=$(gh api repos/${{ github.repository }}/releases/tags/$TAG -q '.assets | map(select(.name | endswith(".dmg"))) | length')
+            ASSET_COUNT=$(gh api repos/${{ github.repository }}/releases/tags/$TAG -q '.assets | map(select(.name | endswith(".dmg"))) | length' 2>/dev/null || echo "0")
 
             if [ "$ASSET_COUNT" -gt 0 ]; then
-              echo "Found release with binaries: $TAG"
+              echo "✅ Found release with binaries: $TAG"
+              echo "strategy=copy_release" >> $GITHUB_OUTPUT
               echo "source_tag=$TAG" >> $GITHUB_OUTPUT
-              echo "found=true" >> $GITHUB_OUTPUT
               exit 0
             fi
           done
 
-          echo "No release with binaries found"
-          echo "found=false" >> $GITHUB_OUTPUT
+          echo "No previous release with binaries found"
+          echo "⚠️ Will need to build binaries from scratch"
+          echo "strategy=build" >> $GITHUB_OUTPUT
 
+  # =============================================================================
+  # Copy binaries from previous release
+  # =============================================================================
+  copy-binaries:
+    name: "Copy Binaries"
+    needs: [detect-changes, patch-release, resolve-binaries]
+    if: needs.detect-changes.outputs.app != 'true' && needs.resolve-binaries.outputs.strategy == 'copy_release'
+    runs-on: ubuntu-latest
+    steps:
       - name: "Download assets from previous release"
-        if: steps.find_release.outputs.found == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p assets
-          SOURCE_TAG="${{ steps.find_release.outputs.source_tag }}"
+          SOURCE_TAG="${{ needs.resolve-binaries.outputs.source_tag }}"
           echo "Downloading assets from $SOURCE_TAG..."
 
-          # Download all assets from the source release
           gh release download "$SOURCE_TAG" --dir assets --pattern "*.dmg" || true
           gh release download "$SOURCE_TAG" --dir assets --pattern "*.exe" || true
           gh release download "$SOURCE_TAG" --dir assets --pattern "*.deb" || true
@@ -367,16 +377,14 @@ jobs:
           ls -la assets/
 
       - name: "Rename assets to new version"
-        if: steps.find_release.outputs.found == 'true'
         run: |
           cd assets
-          SOURCE_TAG="${{ steps.find_release.outputs.source_tag }}"
+          SOURCE_TAG="${{ needs.resolve-binaries.outputs.source_tag }}"
           SOURCE_VERSION="${SOURCE_TAG#v}"
           NEW_VERSION="${{ needs.patch-release.outputs.version }}"
 
           echo "Renaming from version $SOURCE_VERSION to $NEW_VERSION..."
 
-          # Rename all files that contain the version number
           for file in *; do
             if [ -f "$file" ]; then
               newname="${file//$SOURCE_VERSION/$NEW_VERSION}"
@@ -391,7 +399,6 @@ jobs:
           ls -la
 
       - name: "Upload to new release"
-        if: steps.find_release.outputs.found == 'true'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ needs.patch-release.outputs.version }}
@@ -399,11 +406,122 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
-      - name: "No binaries available"
-        if: steps.find_release.outputs.found != 'true'
-        run: |
-          echo "::warning::No previous release with binaries found. This release will not have downloadable binaries."
-          echo "To fix this, trigger a build with app changes or manually upload binaries."
+  # =============================================================================
+  # Build binaries from scratch (fallback when no previous binaries exist)
+  # =============================================================================
+  build-macos:
+    name: "Build macOS"
+    needs: [detect-changes, patch-release, resolve-binaries]
+    if: needs.detect-changes.outputs.app != 'true' && needs.resolve-binaries.outputs.strategy == 'build'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.patch-release.outputs.version }}
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: "Install dependencies"
+        run: npm ci
+
+      - name: "Build macOS"
+        run: npm run app:make:mac
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: "Upload to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.patch-release.outputs.version }}
+          files: |
+            packages/app/out/make/*.dmg
+            packages/app/out/make/zip/darwin/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  build-windows:
+    name: "Build Windows"
+    needs: [detect-changes, patch-release, resolve-binaries]
+    if: needs.detect-changes.outputs.app != 'true' && needs.resolve-binaries.outputs.strategy == 'build'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.patch-release.outputs.version }}
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: "Install dependencies"
+        run: npm ci
+
+      - name: "Build Windows"
+        run: npm run app:make:win
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: "Upload to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.patch-release.outputs.version }}
+          files: |
+            packages/app/out/make/squirrel.windows/**/*.exe
+            packages/app/out/make/squirrel.windows/**/*.nupkg
+            packages/app/out/make/squirrel.windows/**/RELEASES
+            packages/app/out/make/zip/win32/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  build-linux:
+    name: "Build Linux"
+    needs: [detect-changes, patch-release, resolve-binaries]
+    if: needs.detect-changes.outputs.app != 'true' && needs.resolve-binaries.outputs.strategy == 'build'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.patch-release.outputs.version }}
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: "Install Linux dependencies"
+        run: sudo apt-get install -y dpkg fakeroot rpm
+
+      - name: "Install dependencies"
+        run: npm ci
+
+      - name: "Build Linux"
+        run: npm run app:make:linux
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: "Upload to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.patch-release.outputs.version }}
+          files: |
+            packages/app/out/make/deb/x64/*.deb
+            packages/app/out/make/rpm/x64/*.rpm
+            packages/app/out/make/zip/linux/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
   # =============================================================================
   # Deploy landing (only if landing changed)
