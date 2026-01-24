@@ -9,8 +9,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: "Playwright"
+  e2e:
+    name: "E2E / Playwright"
     runs-on: ubuntu-latest
     services:
       postgres:

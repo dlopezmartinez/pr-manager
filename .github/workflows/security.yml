@@ -9,8 +9,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  audit:
-    name: "Audit"
+  security:
+    name: "Security"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
