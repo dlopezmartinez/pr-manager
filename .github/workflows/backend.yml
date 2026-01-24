@@ -33,7 +33,7 @@ jobs:
     name: "Backend / Lint"
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true' || github.base_ref == 'main'
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +54,7 @@ jobs:
     name: "Backend / Test"
     runs-on: ubuntu-latest
     needs: [changes, lint]
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true' || github.base_ref == 'main'
     services:
       postgres:
         image: postgres:15
