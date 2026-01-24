@@ -2,17 +2,7 @@ name: "Deploy Landing"
 
 on:
   workflow_call:
-    inputs:
-      artifact_sha:
-        required: false
-        type: string
-        default: ''
   workflow_dispatch:
-    inputs:
-      artifact_sha:
-        description: 'Commit SHA for artifact (optional - uses latest if empty)'
-        required: false
-        type: string
 
 # Queue deploys - never cancel in-progress
 concurrency:
@@ -21,23 +11,14 @@ concurrency:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   deploy:
     name: "Deploy to Vercel"
     runs-on: ubuntu-latest
     steps:
-      - name: "Download artifact"
-        uses: dawidd6/action-download-artifact@v3
-        with:
-          workflow: landing.yml
-          branch: develop
-          name: landing-.*
-          name_is_regexp: true
-          search_artifacts: true
-          path: dist
-          if_no_artifact_found: fail
+      - name: "Checkout code"
+        uses: actions/checkout@v4
 
       - name: "Setup Node.js"
         uses: actions/setup-node@v4
@@ -48,14 +29,13 @@ jobs:
         run: npm install -g vercel
 
       - name: "Deploy to Vercel"
-        run: |
-          cd dist
-          vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        working-directory: packages/landing
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: "Deployment status"
         run: |
-          echo "✅ Landing page deployed successfully!"
-          echo "🌐 https://prmanager.app"
+          echo "Landing page deployed successfully"
+          echo "URL: https://prmanager.app"
