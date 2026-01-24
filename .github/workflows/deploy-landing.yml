@@ -14,6 +14,11 @@ on:
         required: false
         type: string
 
+# Queue deploys - never cancel in-progress
+concurrency:
+  group: deploy-landing
+  cancel-in-progress: false
+
 permissions:
   contents: read
   actions: read

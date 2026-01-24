@@ -4,6 +4,11 @@ on:
   workflow_call:
   workflow_dispatch:
 
+# Queue deploys - never cancel in-progress
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
 permissions:
   contents: read
 

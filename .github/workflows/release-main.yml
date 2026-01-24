@@ -7,6 +7,11 @@ on:
       - '*.md'
       - 'docs/**'
 
+# Queue releases - never cancel in-progress (could leave repo in broken state)
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
 permissions:
   contents: write
   actions: read
