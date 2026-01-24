@@ -13,10 +13,33 @@ permissions:
 
 jobs:
   # =============================================================================
+  # Check if this is a release commit (skip to prevent loops)
+  # =============================================================================
+  check-commit:
+    name: "Check Commit"
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.check.outputs.should_skip }}
+    steps:
+      - name: "Check commit message"
+        id: check
+        run: |
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          if [[ "$COMMIT_MSG" == chore\(release\):* ]] || [[ "$COMMIT_MSG" == chore:\ sync* ]]; then
+            echo "Skipping release workflow for commit: $COMMIT_MSG"
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "Running release workflow for commit: $COMMIT_MSG"
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+          fi
+
+  # =============================================================================
   # Detect what packages changed
   # =============================================================================
   detect-changes:
     name: "Detect Changes"
+    needs: check-commit
+    if: needs.check-commit.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     outputs:
       app: ${{ steps.filter.outputs.app }}
@@ -45,7 +68,8 @@ jobs:
   # =============================================================================
   patch-release:
     name: "Create Patch Release"
-    needs: detect-changes
+    needs: [check-commit, detect-changes]
+    if: needs.check-commit.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.new_version.outputs.version }}

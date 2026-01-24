@@ -2,37 +2,18 @@ name: "Deploy Backend"
 
 on:
   workflow_call:
-    inputs:
-      artifact_sha:
-        required: false
-        type: string
-        default: ''
   workflow_dispatch:
-    inputs:
-      artifact_sha:
-        description: 'Commit SHA for artifact (optional - uses latest if empty)'
-        required: false
-        type: string
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   deploy:
     name: "Deploy to Railway"
     runs-on: ubuntu-latest
     steps:
-      - name: "Download backend artifact"
-        uses: dawidd6/action-download-artifact@v3
-        with:
-          workflow: backend.yml
-          branch: develop
-          name: backend-.*
-          name_is_regexp: true
-          search_artifacts: true
-          path: packages/backend
-          if_no_artifact_found: fail
+      - name: "Checkout code"
+        uses: actions/checkout@v4
 
       - name: "Setup Node.js"
         uses: actions/setup-node@v4
@@ -43,14 +24,13 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: "Deploy to Railway"
-        run: |
-          cd packages/backend
-          railway up --service pr-manager-backend
+        run: railway up --service pr-manager-backend
+        working-directory: packages/backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: 7508618e-d289-424d-bb95-f2cc0a51b6fc
 
       - name: "Deployment status"
         run: |
-          echo "✅ Backend deployed successfully!"
-          echo "🌐 https://api.prmanager.app"
+          echo "Backend deployed successfully"
+          echo "URL: https://api.prmanager.app"

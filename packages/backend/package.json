@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "postinstall": "prisma generate",
     "build": "tsc",
     "start": "npm run db:migrate:deploy && node dist/index.js",
     "start:no-migrate": "node dist/index.js",
