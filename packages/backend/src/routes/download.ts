@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { verifySignedDownload, getGitHubReleaseUrl } from '../lib/signature.js';
 import { downloadLimiter } from '../middleware/rateLimit.js';
-import { APP_VERSION } from '../lib/version.js';
+import { getLatestVersion } from '../lib/version.js';
 
 const router = Router();
 
@@ -98,7 +98,7 @@ router.get('/latest/:platform', async (req: Request, res: Response) => {
     const { platform } = paramsValidation.data;
     const { signature, expires, user: userId } = queryValidation.data;
 
-    const currentVersion = APP_VERSION;
+    const currentVersion = await getLatestVersion();
 
     const verification = verifySignedDownload(userId, platform, 'latest', signature, expires);
     if (!verification.valid) {

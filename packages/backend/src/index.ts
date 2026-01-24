@@ -4,6 +4,7 @@ import { scheduleDaily, startScheduler, stopScheduler, getSchedulerStatus } from
 import { runSubscriptionSync } from './jobs/syncSubscriptions.js';
 import { processWebhookQueue } from './jobs/processWebhookQueue.js';
 import { prisma } from './lib/prisma.js';
+import { initializeVersionCache } from './lib/version.js';
 
 const app = createApp();
 const PORT = process.env.PORT || 3001;
@@ -14,9 +15,12 @@ app.get('/health/scheduler', (req, res) => {
 });
 
 // Start server
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`PR Manager API server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Initialize version cache from GitHub
+  await initializeVersionCache();
 
   if (process.env.NODE_ENV !== 'production') {
     console.log(`Health check: http://localhost:${PORT}/health`);

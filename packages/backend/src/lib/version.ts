@@ -1,6 +1,19 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+const GITHUB_REPO = 'dlopezmartinez/PR-Manager';
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface VersionCache {
+  version: string;
+  timestamp: number;
+}
+
+let versionCache: VersionCache | null = null;
+
+/**
+ * Get version from package.json as fallback
+ */
 function getPackageVersion(): string {
   try {
     const packageJsonPath = join(__dirname, '..', '..', 'package.json');
@@ -11,8 +24,96 @@ function getPackageVersion(): string {
   }
 }
 
+/**
+ * Fetch latest release version from GitHub API
+ */
+async function fetchLatestReleaseVersion(): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'PR-Manager-Backend',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`GitHub API returned ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json() as { tag_name?: string };
+
+    if (data.tag_name) {
+      // Remove 'v' prefix if present (e.g., 'v0.1.73' -> '0.1.73')
+      return data.tag_name.replace(/^v/, '');
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('Failed to fetch latest release from GitHub:', error);
+    return null;
+  }
+}
+
+/**
+ * Get the current app version (from GitHub or fallback to package.json)
+ */
+export async function getLatestVersion(): Promise<string> {
+  const now = Date.now();
+
+  // Return cached version if still valid
+  if (versionCache && (now - versionCache.timestamp) < CACHE_TTL_MS) {
+    return versionCache.version;
+  }
+
+  // Try to fetch from GitHub
+  const githubVersion = await fetchLatestReleaseVersion();
+
+  if (githubVersion) {
+    versionCache = {
+      version: githubVersion,
+      timestamp: now,
+    };
+    console.log(`Version updated from GitHub: ${githubVersion}`);
+    return githubVersion;
+  }
+
+  // Fallback to package.json
+  const fallbackVersion = getPackageVersion();
+
+  // Cache the fallback too, but for a shorter time
+  versionCache = {
+    version: fallbackVersion,
+    timestamp: now - (CACHE_TTL_MS / 2), // Will retry sooner
+  };
+
+  console.log(`Using fallback version: ${fallbackVersion}`);
+  return fallbackVersion;
+}
+
+/**
+ * Synchronous version getter for backwards compatibility
+ * Returns cached version or package.json version
+ */
+export function getCurrentVersion(): string {
+  if (versionCache) {
+    return versionCache.version;
+  }
+  return getPackageVersion();
+}
+
+/**
+ * Legacy export for backwards compatibility
+ * Will be updated async on first getLatestVersion() call
+ */
 export const APP_VERSION = getPackageVersion();
 
-export function getCurrentVersion(): string {
-  return APP_VERSION;
+/**
+ * Initialize version cache on startup
+ */
+export async function initializeVersionCache(): Promise<void> {
+  await getLatestVersion();
 }

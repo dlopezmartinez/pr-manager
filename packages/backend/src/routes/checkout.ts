@@ -6,7 +6,7 @@ import { generateToken, authenticate } from '../middleware/auth.js';
 import { generateAllSignedUrls } from '../lib/signature.js';
 import { hasActiveSubscriptionOrIsSuperuser } from '../lib/authorization.js';
 import { checkoutLimiter } from '../middleware/rateLimit.js';
-import { APP_VERSION } from '../lib/version.js';
+import { getLatestVersion } from '../lib/version.js';
 
 const router = Router();
 
@@ -161,7 +161,7 @@ router.post('/verify-session', async (req: Request, res: Response) => {
       role: user.role,
     });
 
-    const currentVersion = APP_VERSION;
+    const currentVersion = await getLatestVersion();
     const apiBaseUrl = process.env.API_BASE_URL || 'https://api.prmanager.app';
 
     const downloadUrls = generateAllSignedUrls(user.id, currentVersion, apiBaseUrl);
@@ -204,7 +204,7 @@ router.get('/downloads', authenticate, async (req: Request, res: Response) => {
 
     // Allow downloads for any authenticated user
     // The app itself will check subscription status on login
-    const currentVersion = APP_VERSION;
+    const currentVersion = await getLatestVersion();
     const apiBaseUrl = process.env.API_BASE_URL || 'https://api.prmanager.app';
 
     const downloadUrls = generateAllSignedUrls(req.user!.userId, currentVersion, apiBaseUrl);
