@@ -28,13 +28,16 @@ jobs:
     steps:
       - name: "Check commit message"
         id: check
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          if [[ "$COMMIT_MSG" == chore\(release\):* ]] || [[ "$COMMIT_MSG" == chore:\ sync* ]]; then
-            echo "Skipping release workflow for commit: $COMMIT_MSG"
+          # Get only the first line of commit message
+          FIRST_LINE=$(echo "$COMMIT_MSG" | head -1)
+          if [[ "$FIRST_LINE" == chore\(release\):* ]] || [[ "$FIRST_LINE" == chore:\ sync* ]]; then
+            echo "Skipping release workflow for commit: $FIRST_LINE"
             echo "should_skip=true" >> $GITHUB_OUTPUT
           else
-            echo "Running release workflow for commit: $COMMIT_MSG"
+            echo "Running release workflow for commit: $FIRST_LINE"
             echo "should_skip=false" >> $GITHUB_OUTPUT
           fi
 
