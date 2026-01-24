@@ -98,6 +98,14 @@ import Footer from '../components/Footer.astro';
 <script>
   const API_URL = 'https://api.prmanager.app';
 
+  // Fallback messages for network/unknown errors
+  const FALLBACK_MESSAGES = {
+    network: 'Unable to connect to the server. Please check your internet connection.',
+    rateLimit: 'Too many attempts. Please wait a moment and try again.',
+    server: 'Something went wrong on our end. Please try again later.',
+    default: 'Unable to create account. Please try again.',
+  };
+
   // Get plan from URL params
   const urlParams = new URLSearchParams(window.location.search);
   const plan = urlParams.get('plan') || 'monthly';
@@ -141,22 +149,53 @@ import Footer from '../components/Footer.astro';
         }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create account');
+      // Handle rate limiting
+      if (response.status === 429) {
+        showError(FALLBACK_MESSAGES.rateLimit);
+        resetButton();
+        return;
       }
 
-      // Store token in localStorage (will be used by checkout page)
-      localStorage.setItem('pr_manager_token', data.token);
+      // Handle server errors
+      if (response.status >= 500) {
+        showError(FALLBACK_MESSAGES.server);
+        resetButton();
+        return;
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        showError(FALLBACK_MESSAGES.server);
+        resetButton();
+        return;
+      }
+
+      if (!response.ok) {
+        // Use message from backend (already user-friendly)
+        showError(data.message || FALLBACK_MESSAGES.default);
+        resetButton();
+        return;
+      }
+
+      // Store tokens in localStorage (will be used by checkout page)
+      localStorage.setItem('pr_manager_token', data.accessToken);
+      if (data.refreshToken) {
+        localStorage.setItem('pr_manager_refresh_token', data.refreshToken);
+      }
       localStorage.setItem('pr_manager_user', JSON.stringify(data.user));
 
       // Redirect to checkout with the selected plan
       window.location.href = `/checkout?plan=${plan}`;
-    } catch (error: any) {
-      showError(error.message || 'Something went wrong. Please try again.');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Create Account';
+    } catch (error: unknown) {
+      // Network error or fetch failed
+      if (error instanceof TypeError) {
+        showError(FALLBACK_MESSAGES.network);
+      } else {
+        showError(FALLBACK_MESSAGES.default);
+      }
+      resetButton();
     }
   });
 
@@ -167,5 +206,10 @@ import Footer from '../components/Footer.astro';
 
   function hideError() {
     errorMessage.classList.add('hidden');
+  }
+
+  function resetButton() {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Create Account';
   }
 </script>
