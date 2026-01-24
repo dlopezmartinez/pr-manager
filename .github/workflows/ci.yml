@@ -4,6 +4,11 @@ on:
   pull_request:
     branches: [develop, main]
 
+# Permissions needed for dorny/paths-filter to read PR files
+permissions:
+  contents: read
+  pull-requests: read
+
 # Cancel in-progress runs for the same PR
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
