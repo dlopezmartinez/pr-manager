@@ -204,3 +204,105 @@ export function getAssetsForPlatform(release: GitHubRelease, platform: Platform)
 export function extractVersionFromTag(tagName: string): string {
   return tagName.replace(/^v/, '');
 }
+
+/**
+ * Get a temporary download URL for a release asset.
+ * GitHub API returns a 302 redirect to a temporary S3 URL when requesting
+ * an asset with Accept: application/octet-stream. This temporary URL works
+ * without authentication and is valid for a short period.
+ */
+export async function getAssetDownloadUrl(assetId: number): Promise<string | null> {
+  const { owner, repo, token } = getGitHubConfig();
+
+  try {
+    const response = await fetch(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/releases/assets/${assetId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/octet-stream',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        redirect: 'manual', // Don't follow redirect, we want the URL
+      }
+    );
+
+    // GitHub returns 302 with Location header pointing to S3
+    if (response.status === 302) {
+      const location = response.headers.get('Location');
+      if (location) {
+        return location;
+      }
+    }
+
+    // Fallback: if somehow we get a 200, the URL was already resolved
+    if (response.ok) {
+      console.warn('[GitHubRelease] Got 200 instead of 302 for asset download');
+      return null;
+    }
+
+    console.error(`[GitHubRelease] Failed to get asset URL: ${response.status}`);
+    return null;
+  } catch (error) {
+    console.error('[GitHubRelease] Error getting asset download URL:', error);
+    return null;
+  }
+}
+
+export type DownloadPlatform = 'mac' | 'windows' | 'linux-deb' | 'linux-rpm';
+
+/**
+ * Find the appropriate asset for a download platform
+ */
+export function findAssetForDownloadPlatform(
+  release: GitHubRelease,
+  platform: DownloadPlatform,
+  version: string
+): GitHubAsset | null {
+  const expectedNames: Record<DownloadPlatform, string> = {
+    'mac': `PR-Manager-${version}.dmg`,
+    'windows': `PRManager-${version}-Setup.exe`,
+    'linux-deb': `pr-manager_${version}_amd64.deb`,
+    'linux-rpm': `pr-manager-${version}.x86_64.rpm`,
+  };
+
+  const expectedName = expectedNames[platform].toLowerCase();
+
+  for (const asset of release.assets) {
+    if (asset.name.toLowerCase() === expectedName) {
+      return asset;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get release by version tag
+ */
+export async function getReleaseByTag(version: string): Promise<GitHubRelease | null> {
+  const { owner, repo } = getGitHubConfig();
+  const tag = version.startsWith('v') ? version : `v${version}`;
+
+  try {
+    const response = await fetch(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/releases/tags/${tag}`,
+      { headers: getAuthHeaders() }
+    );
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      console.error(`[GitHubRelease] Failed to fetch release ${tag}: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return releaseSchema.parse(data);
+  } catch (error) {
+    console.error('[GitHubRelease] Error fetching release by tag:', error);
+    return null;
+  }
+}

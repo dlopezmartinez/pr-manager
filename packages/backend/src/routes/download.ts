@@ -1,9 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
-import { verifySignedDownload, getGitHubReleaseUrl } from '../lib/signature.js';
+import { verifySignedDownload } from '../lib/signature.js';
 import { downloadLimiter } from '../middleware/rateLimit.js';
-import { getLatestVersion } from '../lib/version.js';
+import {
+  getReleaseByTag,
+  getLatestRelease,
+  findAssetForDownloadPlatform,
+  getAssetDownloadUrl,
+  type DownloadPlatform,
+} from '../services/githubReleaseService.js';
 
 const router = Router();
 
@@ -60,9 +66,34 @@ router.get('/:platform/:version', downloadLimiter, async (req: Request, res: Res
       return;
     }
 
-    const downloadUrl = getGitHubReleaseUrl(platform, version);
+    // Get release from GitHub API
+    const release = await getReleaseByTag(version);
+    if (!release) {
+      res.status(404).json({
+        error: `Release v${version} not found`,
+      });
+      return;
+    }
 
-    console.log(`Download: user=${userId}, platform=${platform}, version=${version}`);
+    // Find the asset for this platform
+    const asset = findAssetForDownloadPlatform(release, platform as DownloadPlatform, version);
+    if (!asset) {
+      res.status(404).json({
+        error: `No download available for ${platform} in version ${version}`,
+      });
+      return;
+    }
+
+    // Get temporary download URL from GitHub
+    const downloadUrl = await getAssetDownloadUrl(asset.id);
+    if (!downloadUrl) {
+      res.status(500).json({
+        error: 'Failed to generate download URL',
+      });
+      return;
+    }
+
+    console.log(`Download: user=${userId}, platform=${platform}, version=${version}, asset=${asset.name}`);
 
     res.redirect(302, downloadUrl);
   } catch (error) {
@@ -98,8 +129,6 @@ router.get('/latest/:platform', async (req: Request, res: Response) => {
     const { platform } = paramsValidation.data;
     const { signature, expires, user: userId } = queryValidation.data;
 
-    const currentVersion = await getLatestVersion();
-
     const verification = verifySignedDownload(userId, platform, 'latest', signature, expires);
     if (!verification.valid) {
       res.status(403).json({ error: verification.error || 'Invalid download link' });
@@ -117,7 +146,37 @@ router.get('/latest/:platform', async (req: Request, res: Response) => {
       return;
     }
 
-    const downloadUrl = getGitHubReleaseUrl(platform, currentVersion);
+    // Get latest release from GitHub API
+    const release = await getLatestRelease();
+    if (!release) {
+      res.status(404).json({
+        error: 'No release available',
+      });
+      return;
+    }
+
+    const currentVersion = release.tag_name.replace(/^v/, '');
+
+    // Find the asset for this platform
+    const asset = findAssetForDownloadPlatform(release, platform as DownloadPlatform, currentVersion);
+    if (!asset) {
+      res.status(404).json({
+        error: `No download available for ${platform} in latest version`,
+      });
+      return;
+    }
+
+    // Get temporary download URL from GitHub
+    const downloadUrl = await getAssetDownloadUrl(asset.id);
+    if (!downloadUrl) {
+      res.status(500).json({
+        error: 'Failed to generate download URL',
+      });
+      return;
+    }
+
+    console.log(`Latest download: user=${userId}, platform=${platform}, version=${currentVersion}, asset=${asset.name}`);
+
     res.redirect(302, downloadUrl);
   } catch (error) {
     console.error('Latest download error:', error);
