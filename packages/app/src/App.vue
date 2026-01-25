@@ -325,8 +325,11 @@ async function handleAuthenticated() {
   await authStore.refreshSubscription();
 }
 
-function handleSubscribed() {
-  authStore.refreshSubscription();
+async function handleSubscribed() {
+  await authStore.refreshSubscription();
+  initializeFollowUpService(provider.pullRequests);
+  loadCurrentView();
+  startPolling();
 }
 
 function handleAuthLogout() {
