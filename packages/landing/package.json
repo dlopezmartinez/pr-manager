@@ -1,7 +1,7 @@
 {
   "name": "@pr-manager/landing",
   "type": "module",
-  "version": "0.1.80",
+  "version": "0.1.81",
   "description": "PR Manager - Landing Page",
   "scripts": {
     "dev": "astro dev",
