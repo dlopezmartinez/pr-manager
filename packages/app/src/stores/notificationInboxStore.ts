@@ -6,7 +6,8 @@ export type NotificationChangeType =
   | 'new_reviews'
   | 'status_change'
   | 'pr_closed'
-  | 'pr_merged';
+  | 'pr_merged'
+  | 'ready_to_merge';
 
 export interface InboxNotification {
   id: string;
@@ -263,6 +264,8 @@ export function getNotificationTypeText(type: NotificationChangeType, count?: nu
       return 'PR closed';
     case 'pr_merged':
       return 'PR merged';
+    case 'ready_to_merge':
+      return 'Ready to merge';
     default:
       return 'Update';
   }

@@ -28,6 +28,14 @@
 
     <div class="notification-actions" @click.stop>
       <button
+        v-if="notification.type === 'ready_to_merge'"
+        class="action-btn merge-btn"
+        @click="$emit('merge')"
+        title="Merge PR"
+      >
+        <GitMerge :size="14" :stroke-width="2" />
+      </button>
+      <button
         class="action-btn dismiss-btn"
         @click="$emit('dismiss')"
         title="Dismiss"
@@ -40,7 +48,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { GitCommit, MessageSquare, UserCheck, AlertCircle, GitMerge, XCircle, X } from 'lucide-vue-next';
+import { GitCommit, MessageSquare, UserCheck, AlertCircle, GitMerge, XCircle, X, CheckCircle2 } from 'lucide-vue-next';
 import type { InboxNotification, NotificationChangeType } from '../stores/notificationInboxStore';
 import { getNotificationTypeText } from '../stores/notificationInboxStore';
 
@@ -51,6 +59,7 @@ const props = defineProps<{
 defineEmits<{
   (e: 'click'): void;
   (e: 'dismiss'): void;
+  (e: 'merge'): void;
 }>();
 
 const typeIcon = computed(() => {
@@ -67,6 +76,8 @@ const typeIcon = computed(() => {
       return GitMerge;
     case 'pr_closed':
       return XCircle;
+    case 'ready_to_merge':
+      return CheckCircle2;
     default:
       return AlertCircle;
   }
@@ -189,6 +200,11 @@ const timeAgo = computed(() => {
   color: var(--color-pr-merged);
 }
 
+.type-badge.ready_to_merge {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
 .notification-time {
   font-size: 11px;
   color: var(--color-text-tertiary);
@@ -242,5 +258,15 @@ const timeAgo = computed(() => {
 .action-btn:hover {
   background: var(--color-surface-hover);
   color: var(--color-text-primary);
+}
+
+.merge-btn {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.merge-btn:hover {
+  background: var(--color-success);
+  color: white;
 }
 </style>

@@ -46,6 +46,7 @@
           :notification="notification"
           @click="handleNotificationClick(notification)"
           @dismiss="handleDismiss(notification.id)"
+          @merge="handleMerge(notification)"
         />
       </div>
     </div>
@@ -81,6 +82,13 @@ function handleDismiss(notificationId: string) {
 
 function handleDismissAll() {
   markAllAsRead();
+}
+
+function handleMerge(notification: InboxNotification) {
+  // Open the PR URL in the browser for merging
+  // Full merge functionality would require additional API integration
+  markAsRead(notification.id);
+  openExternal(notification.url).catch(console.error);
 }
 </script>
 

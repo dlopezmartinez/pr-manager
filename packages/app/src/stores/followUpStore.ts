@@ -8,6 +8,22 @@ export interface FollowedPRState {
   updatedAt: string;
 }
 
+export interface FollowedPRNotificationPrefs {
+  notifyOnCommits: boolean;
+  notifyOnComments: boolean;
+  notifyOnReviews: boolean;
+  notifyOnWorkflows: boolean;
+  notifyOnReadyToMerge: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFS: FollowedPRNotificationPrefs = {
+  notifyOnCommits: true,
+  notifyOnComments: true,
+  notifyOnReviews: true,
+  notifyOnWorkflows: false,
+  notifyOnReadyToMerge: true,
+};
+
 export interface FollowedPRInfo {
   prId: string;
   prNumber: number;
@@ -18,6 +34,7 @@ export interface FollowedPRInfo {
   authorAvatarUrl: string;
   followedAt: string;
   lastKnownState: FollowedPRState;
+  notificationPrefs: FollowedPRNotificationPrefs;
 }
 
 interface FollowUpStoreData {
@@ -119,7 +136,7 @@ watch(
   { deep: true }
 );
 
-export function followPR(pr: PullRequestBasic): boolean {
+export function followPR(pr: PullRequestBasic, prefs?: Partial<FollowedPRNotificationPrefs>): boolean {
   if (Object.keys(storeData.followedPRs).length >= MAX_FOLLOWED_PRS) {
     console.warn(`Cannot follow more than ${MAX_FOLLOWED_PRS} PRs`);
     return false;
@@ -135,9 +152,23 @@ export function followPR(pr: PullRequestBasic): boolean {
     authorAvatarUrl: pr.author.avatarUrl,
     followedAt: new Date().toISOString(),
     lastKnownState: extractPRState(pr),
+    notificationPrefs: {
+      ...DEFAULT_NOTIFICATION_PREFS,
+      ...prefs,
+    },
   };
 
   return true;
+}
+
+export function updateFollowedPRPrefs(prId: string, prefs: Partial<FollowedPRNotificationPrefs>): void {
+  const info = storeData.followedPRs[prId];
+  if (info) {
+    info.notificationPrefs = {
+      ...info.notificationPrefs,
+      ...prefs,
+    };
+  }
 }
 
 export function unfollowPR(prId: string): void {

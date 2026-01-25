@@ -9,10 +9,37 @@ import {
 } from '../stores/followUpStore';
 import {
   addBatchNotifications,
+  addNotification,
   type InboxNotification,
 } from '../stores/notificationInboxStore';
 import { showNotification } from '../utils/electron';
 import { configStore } from '../stores/configStore';
+
+interface ReadyToMergeState {
+  wasReadyToMerge: boolean;
+}
+
+const readyToMergeCache = new Map<string, ReadyToMergeState>();
+
+/**
+ * Check if a PR is ready to merge:
+ * - All checks pass (SUCCESS state)
+ * - At least one approval
+ * - PR is open and not a draft
+ */
+function isReadyToMerge(pr: PullRequestBasic): boolean {
+  if (pr.state !== 'OPEN' || pr.isDraft) {
+    return false;
+  }
+
+  const checksPass = pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state === 'SUCCESS';
+  if (!checksPass) {
+    return false;
+  }
+
+  const hasApproval = pr.reviews?.nodes?.some(r => r.state === 'APPROVED');
+  return !!hasApproval;
+}
 
 export interface FollowUpPollingResult {
   checked: number;
@@ -95,6 +122,7 @@ export class FollowUpService {
 
       if (currentPR.state !== 'OPEN') {
         removeClosedPR(info.prId);
+        readyToMergeCache.delete(info.prId);
         addBatchNotifications(
           {
             prId: info.prId,
@@ -111,6 +139,7 @@ export class FollowUpService {
       }
 
       const changes = detectChanges(info.prId, currentPR as PullRequestBasic);
+      const prefs = info.notificationPrefs;
 
       if (changes.hasChanges) {
         result.changesDetected++;
@@ -121,13 +150,18 @@ export class FollowUpService {
           newReviews?: number;
         } = {};
 
-        if (changes.newCommits && configStore.followUpNotifyOnCommits) {
+        // Respect per-PR notification preferences, with fallback to global settings
+        const shouldNotifyCommits = prefs?.notifyOnCommits ?? configStore.followUpNotifyOnCommits;
+        const shouldNotifyComments = prefs?.notifyOnComments ?? configStore.followUpNotifyOnComments;
+        const shouldNotifyReviews = prefs?.notifyOnReviews ?? configStore.followUpNotifyOnReviews;
+
+        if (changes.newCommits && shouldNotifyCommits) {
           notificationChanges.newCommits = changes.newCommits;
         }
-        if (changes.newComments && configStore.followUpNotifyOnComments) {
+        if (changes.newComments && shouldNotifyComments) {
           notificationChanges.newComments = changes.newComments;
         }
-        if (changes.newReviews && configStore.followUpNotifyOnReviews) {
+        if (changes.newReviews && shouldNotifyReviews) {
           notificationChanges.newReviews = changes.newReviews;
         }
 
@@ -152,6 +186,33 @@ export class FollowUpService {
         }
 
         updatePRState(info.prId, currentPR as PullRequestBasic);
+      }
+
+      // Check for ready-to-merge status
+      const shouldNotifyReadyToMerge = prefs?.notifyOnReadyToMerge ?? true;
+      if (shouldNotifyReadyToMerge) {
+        const currentlyReady = isReadyToMerge(currentPR as PullRequestBasic);
+        const previousState = readyToMergeCache.get(info.prId);
+
+        if (currentlyReady && (!previousState || !previousState.wasReadyToMerge)) {
+          console.log(`FollowUpService: PR #${info.prNumber} is now ready to merge`);
+
+          const notification = addNotification({
+            prId: info.prId,
+            prNumber: info.prNumber,
+            prTitle: currentPR.title,
+            repoNameWithOwner: info.repoNameWithOwner,
+            url: currentPR.url,
+            authorLogin: info.authorLogin,
+            authorAvatarUrl: info.authorAvatarUrl,
+            type: 'ready_to_merge',
+            changeDetails: {},
+          });
+
+          result.notificationsCreated.push(notification);
+        }
+
+        readyToMergeCache.set(info.prId, { wasReadyToMerge: currentlyReady });
       }
     } catch (error) {
       console.error(`FollowUpService: Error polling PR ${info.prNumber}:`, error);
