@@ -181,7 +181,7 @@
           </section>
 
           <section class="settings-section">
-            <h3>Auto-refresh</h3>
+            <h3>Notifications – Auto refresh</h3>
             
             <div class="setting-row">
               <div class="setting-info">
