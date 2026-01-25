@@ -31,7 +31,6 @@
       />
 
       <div v-else-if="!isValidatingToken" class="content-wrapper">
-      <TrialBanner />
       <TitleBar>
         <template #left>
           <h1 class="app-title">Pull Requests</h1>
@@ -63,6 +62,8 @@
           </button>
         </template>
       </TitleBar>
+
+      <TrialBanner />
 
       <header class="header">
         <div class="header-content">
