@@ -363,15 +363,16 @@ jobs:
         run: |
           mkdir -p assets
           SOURCE_TAG="${{ needs.resolve-binaries.outputs.source_tag }}"
+          REPO="${{ github.repository }}"
           echo "Downloading assets from $SOURCE_TAG..."
 
-          gh release download "$SOURCE_TAG" --dir assets --pattern "*.dmg" || true
-          gh release download "$SOURCE_TAG" --dir assets --pattern "*.exe" || true
-          gh release download "$SOURCE_TAG" --dir assets --pattern "*.deb" || true
-          gh release download "$SOURCE_TAG" --dir assets --pattern "*.rpm" || true
-          gh release download "$SOURCE_TAG" --dir assets --pattern "*.zip" || true
-          gh release download "$SOURCE_TAG" --dir assets --pattern "*.nupkg" || true
-          gh release download "$SOURCE_TAG" --dir assets --pattern "RELEASES" || true
+          gh release download "$SOURCE_TAG" --repo "$REPO" --dir assets --pattern "*.dmg" || true
+          gh release download "$SOURCE_TAG" --repo "$REPO" --dir assets --pattern "*.exe" || true
+          gh release download "$SOURCE_TAG" --repo "$REPO" --dir assets --pattern "*.deb" || true
+          gh release download "$SOURCE_TAG" --repo "$REPO" --dir assets --pattern "*.rpm" || true
+          gh release download "$SOURCE_TAG" --repo "$REPO" --dir assets --pattern "*.zip" || true
+          gh release download "$SOURCE_TAG" --repo "$REPO" --dir assets --pattern "*.nupkg" || true
+          gh release download "$SOURCE_TAG" --repo "$REPO" --dir assets --pattern "RELEASES" || true
 
           echo "Downloaded assets:"
           ls -la assets/
