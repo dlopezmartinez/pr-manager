@@ -520,7 +520,7 @@ import { X, Bell, MessageSquare, Github, GitMerge, AlertCircle, ArrowRight, Exte
 import TitleBar from './TitleBar.vue';
 import type { TokenValidationResult } from '../utils/electron';
 import { configStore, updateConfig, saveApiKey, clearApiKey, getApiKey } from '../stores/configStore';
-import { useAuthStore } from '../stores/authStore';
+import { authStore } from '../stores/authStore';
 import { showNotification, isElectron, setZoomLevel, getZoomLevel, validateToken as validateTokenAPI, openExternal, getAppVersion, getPlatform } from '../utils/electron';
 import { followedCount, clearAllFollowed } from '../stores/followUpStore';
 import type { ProviderType } from '../model/provider-types';
@@ -550,7 +550,6 @@ const emit = defineEmits<{
   (e: 'provider-changed'): void;
 }>();
 
-const authStore = useAuthStore();
 const config = configStore;
 const isMac = computed(() => getPlatform() === 'darwin');
 const localUsername = ref(config.username);
