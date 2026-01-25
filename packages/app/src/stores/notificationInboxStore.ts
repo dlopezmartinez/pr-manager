@@ -128,15 +128,23 @@ export function addNotification(
   };
 
   console.log('NotificationInboxStore: Adding notification:', newNotification.id, newNotification.type);
+  console.log('NotificationInboxStore: Notification details:', JSON.stringify(newNotification, null, 2));
+  console.log('NotificationInboxStore: Store reference check - notifications array length before:', storeData.notifications.length);
 
-  storeData.notifications.unshift(newNotification);
+  // Create a new array to ensure Vue's reactivity detects the change
+  // This is more robust than array mutation methods like unshift
+  const updatedNotifications = [newNotification, ...storeData.notifications];
+
+  // Enforce max notifications limit
+  if (updatedNotifications.length > MAX_NOTIFICATIONS) {
+    storeData.notifications = updatedNotifications.slice(0, MAX_NOTIFICATIONS);
+  } else {
+    storeData.notifications = updatedNotifications;
+  }
 
   console.log('NotificationInboxStore: Total notifications now:', storeData.notifications.length);
   console.log('NotificationInboxStore: Unread notifications:', storeData.notifications.filter(n => !n.read).length);
-
-  if (storeData.notifications.length > MAX_NOTIFICATIONS) {
-    storeData.notifications = storeData.notifications.slice(0, MAX_NOTIFICATIONS);
-  }
+  console.log('NotificationInboxStore: First notification in array:', storeData.notifications[0]?.id);
 
   return newNotification;
 }

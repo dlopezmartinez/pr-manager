@@ -58,9 +58,7 @@ import { computed } from 'vue';
 import { Bell, BellOff, Eye, CheckCheck } from 'lucide-vue-next';
 import NotificationItem from './NotificationItem.vue';
 import {
-  unreadNotificationsList,
-  unreadCount,
-  hasUnread,
+  notificationInboxStore,
   markAsRead,
   markAllAsRead,
   type InboxNotification,
@@ -68,8 +66,17 @@ import {
 import { followedCount } from '../stores/followUpStore';
 import { openExternal } from '../utils/electron';
 
-const unreadNotifications = unreadNotificationsList;
-const hasUnreadNotifications = hasUnread;
+// Use local computeds that directly access the reactive store
+// This ensures proper reactivity tracking within the component
+const unreadNotifications = computed(() =>
+  notificationInboxStore.notifications.filter(n => !n.read)
+);
+const hasUnreadNotifications = computed(() =>
+  notificationInboxStore.notifications.some(n => !n.read)
+);
+const unreadCount = computed(() =>
+  notificationInboxStore.notifications.filter(n => !n.read).length
+);
 
 function handleNotificationClick(notification: InboxNotification) {
   markAsRead(notification.id);

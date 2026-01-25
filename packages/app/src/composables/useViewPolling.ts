@@ -57,7 +57,8 @@ export function useViewPolling() {
 
     pollingLogger.debug(`Refreshing view: ${view.name} (${view.id})`);
 
-    pollFollowedPRs();
+    // IMPORTANT: Await pollFollowedPRs so notifications are created before returning
+    await pollFollowedPRs();
 
     if (isNotificationsView(view.id)) {
       pollingLogger.debug('Notifications view is active, skipping API polling');
@@ -95,7 +96,10 @@ export function useViewPolling() {
   }
 
   async function pollFollowedPRs(): Promise<void> {
+    pollingLogger.debug('pollFollowedPRs called');
+
     if (!configStore.followUpEnabled) {
+      pollingLogger.debug('pollFollowedPRs: followUpEnabled is false, skipping');
       return;
     }
 
@@ -105,12 +109,15 @@ export function useViewPolling() {
       return;
     }
 
+    pollingLogger.debug('pollFollowedPRs: Calling followUpService.pollFollowedPRs()');
+
     try {
       const result = await followUpService.pollFollowedPRs();
-      if (result.changesDetected > 0) {
-        pollingLogger.debug(
-          `Follow-up polling: ${result.changesDetected} changes detected, ${result.notificationsCreated.length} notifications created`
-        );
+      pollingLogger.debug(
+        `Follow-up polling complete: checked=${result.checked}, changesDetected=${result.changesDetected}, notificationsCreated=${result.notificationsCreated.length}`
+      );
+      if (result.errors.length > 0) {
+        pollingLogger.warn('Follow-up polling had errors:', result.errors);
       }
     } catch (e) {
       pollingLogger.error('Follow-up polling error:', e);
@@ -129,12 +136,18 @@ export function useViewPolling() {
   watch(
     followedCount,
     (count) => {
+      pollingLogger.debug(`followedCount watch triggered: count=${count}, isPolling=${isPolling.value}, pollingEnabled=${configStore.pollingEnabled}`);
+
       if (count === 0 && isPolling.value) {
         pollingLogger.debug('No followed PRs, stopping auto-poll');
         stopPolling();
       } else if (count > 0 && !isPolling.value && configStore.pollingEnabled) {
         pollingLogger.debug('Followed PRs detected, starting auto-poll');
         startPolling();
+      } else if (count > 0 && !configStore.pollingEnabled) {
+        pollingLogger.debug('Followed PRs exist but polling is disabled in settings');
+      } else if (count > 0 && isPolling.value) {
+        pollingLogger.debug('Followed PRs exist and polling is already running');
       }
     },
     { immediate: true }

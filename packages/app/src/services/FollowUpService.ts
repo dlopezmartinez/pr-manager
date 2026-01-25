@@ -141,6 +141,9 @@ export class FollowUpService {
       const changes = detectChanges(info.prId, currentPR as PullRequestBasic);
       const prefs = info.notificationPrefs;
 
+      console.log(`FollowUpService: PR #${info.prNumber} changes:`, changes);
+      console.log(`FollowUpService: PR #${info.prNumber} prefs:`, prefs);
+
       if (changes.hasChanges) {
         result.changesDetected++;
 
