@@ -141,6 +141,7 @@ vi.mock('../../src/services/FollowUpService', () => ({
 // Mock default-views
 vi.mock('../../src/config/default-views', () => ({
   isNotificationsView: (id: string) => id === 'notifications',
+  isPinnedView: (id: string) => id === 'pinned',
 }));
 
 describe('useViewPolling', () => {
