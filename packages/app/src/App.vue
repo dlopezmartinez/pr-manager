@@ -204,7 +204,7 @@ const prCounts = computed(() => {
   return counts;
 });
 
-const { isPolling, nextPollIn, startPolling, restartPolling } = useViewPolling();
+const { isPolling, nextPollIn, startPolling, restartPolling, refreshActiveView } = useViewPolling();
 const authHealthPolling = useAuthHealthPolling();
 
 onMounted(async () => {
@@ -358,7 +358,12 @@ function handleGlobalError(error: Error, info: string) {
 }
 
 async function handleManualRefresh() {
-  await loadCurrentView();
+  // refreshActiveView polls followed PRs and updates notifications
+  // loadCurrentView handles the view-specific loading UI
+  await Promise.all([
+    refreshActiveView(),
+    loadCurrentView(),
+  ]);
   restartPolling();
 }
 

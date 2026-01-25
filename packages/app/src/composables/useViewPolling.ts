@@ -125,6 +125,7 @@ export function useViewPolling() {
     });
 
   // Watch followed count to start/stop polling appropriately
+  // immediate: true ensures polling starts if there are already followed PRs on app load
   watch(
     followedCount,
     (count) => {
@@ -135,7 +136,8 @@ export function useViewPolling() {
         pollingLogger.debug('Followed PRs detected, starting auto-poll');
         startPolling();
       }
-    }
+    },
+    { immediate: true }
   );
 
   // Removed automatic polling on view switch - views only refresh on manual action

@@ -194,7 +194,8 @@ watch(
 );
 
 export const activeView = computed<ViewConfig>(() => {
-  return viewStore.views.find((v) => v.id === viewStore.activeViewId) || viewStore.views[0];
+  // Check both static views and dynamic views (like pinned)
+  return sortedViews.value.find((v) => v.id === viewStore.activeViewId) || viewStore.views[0];
 });
 
 export const sortedViews = computed<ViewConfig[]>(() => {
@@ -213,7 +214,9 @@ export const sortedViews = computed<ViewConfig[]>(() => {
 });
 
 export function setActiveView(viewId: ViewId): void {
-  const view = viewStore.views.find((v) => v.id === viewId);
+  // Check both static views and dynamic views (like pinned)
+  const allViews = sortedViews.value;
+  const view = allViews.find((v) => v.id === viewId);
   if (view) {
     viewStore.activeViewId = viewId;
   } else {
