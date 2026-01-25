@@ -1,4 +1,4 @@
-import type { PullRequestBasic } from '../model/types';
+import type { PullRequestBasic, PullRequest, MergeStateStatus } from '../model/types';
 import type { IPullRequestManager } from '../providers/interfaces';
 import {
   getFollowedPRs,
@@ -22,23 +22,38 @@ interface ReadyToMergeState {
 const readyToMergeCache = new Map<string, ReadyToMergeState>();
 
 /**
- * Check if a PR is ready to merge:
- * - All checks pass (SUCCESS state)
- * - At least one approval
- * - PR is open and not a draft
+ * Check if a PR is ready to merge using GitHub's mergeStateStatus.
+ * This respects the actual branch protection rules configured on the repo.
+ *
+ * mergeStateStatus values:
+ * - CLEAN: Ready to merge - all branch protection rules satisfied
+ * - BLOCKED: Blocked by branch protection (checks failing, reviews needed, etc.)
+ * - BEHIND: Branch is behind base branch
+ * - DIRTY: Has merge conflicts
+ * - DRAFT: Is a draft PR
+ * - UNSTABLE: Some checks failing but still mergeable
+ * - UNKNOWN: State is being calculated
  */
-function isReadyToMerge(pr: PullRequestBasic): boolean {
+function isReadyToMerge(pr: PullRequestBasic | PullRequest): boolean {
+  // Basic checks
   if (pr.state !== 'OPEN' || pr.isDraft) {
     return false;
   }
 
-  const checksPass = pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state === 'SUCCESS';
-  if (!checksPass) {
-    return false;
+  // Use mergeStateStatus if available (from PR_DETAILS_BY_ID_QUERY)
+  const mergeStateStatus = (pr as PullRequest).mergeStateStatus;
+
+  if (mergeStateStatus) {
+    console.log(`isReadyToMerge PR #${pr.number}: mergeStateStatus=${mergeStateStatus}`);
+    // CLEAN means all branch protection rules are satisfied
+    return mergeStateStatus === 'CLEAN';
   }
 
-  const hasApproval = pr.reviews?.nodes?.some(r => r.state === 'APPROVED');
-  return !!hasApproval;
+  // Fallback for list queries that don't include mergeStateStatus
+  // Check if all CI checks pass
+  const checksPass = pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state === 'SUCCESS';
+  console.log(`isReadyToMerge PR #${pr.number}: fallback check, checksPass=${checksPass}`);
+  return checksPass;
 }
 
 export interface FollowUpPollingResult {
