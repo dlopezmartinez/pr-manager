@@ -126,13 +126,10 @@ export class GitLabPullRequestManager implements IPullRequestManager {
   /**
    * Get merge requests awaiting review from the specified user
    */
-  async getPRsToReview(username?: string, limit = 20, after?: string): Promise<ListResult> {
-    const user = username || (await this.getCurrentUser());
-
+  async getPRsToReview(_username?: string, limit = 20, after?: string): Promise<ListResult> {
     const result = await this.gitlabService.executeQuery<GitLabMRListResponse>(
       MERGE_REQUESTS_LIST_QUERY,
       {
-        username: user,
         state: 'opened',
         first: limit,
         after,
@@ -145,13 +142,10 @@ export class GitLabPullRequestManager implements IPullRequestManager {
   /**
    * Get merge requests authored by the specified user
    */
-  async getMyPullRequests(username?: string, limit = 20, after?: string): Promise<ListResult> {
-    const user = username || (await this.getCurrentUser());
-
+  async getMyPullRequests(_username?: string, limit = 20, after?: string): Promise<ListResult> {
     const result = await this.gitlabService.executeQuery<GitLabMRListResponse>(
       MY_MERGE_REQUESTS_QUERY,
       {
-        username: user,
         state: 'opened',
         first: limit,
         after,

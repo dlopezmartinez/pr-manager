@@ -126,7 +126,6 @@ export interface GitLabMergeRequest {
   webUrl: string;
   state: 'opened' | 'closed' | 'merged' | 'locked';
   draft?: boolean;
-  workInProgress?: boolean;
   createdAt: string;
   updatedAt: string;
   mergedAt?: string;
@@ -423,7 +422,7 @@ export class GitLabResponseAdapter {
       title: mr.title,
       url: mr.webUrl,
       state: this.transformState(mr.state),
-      isDraft: mr.draft || mr.workInProgress || false,
+      isDraft: mr.draft || false,
       repository: {
         nameWithOwner: mr.project.fullPath,
       },
@@ -477,7 +476,7 @@ export class GitLabResponseAdapter {
     }
 
     // Check draft status
-    if (mr.draft || mr.workInProgress) {
+    if (mr.draft) {
       return 'DRAFT';
     }
 
