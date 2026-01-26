@@ -279,17 +279,16 @@
               />
             </div>
 
-            <div class="checkbox-filters">
-              <label class="checkbox-label">
-                <input
-                  type="checkbox"
-                  :checked="gitlabDraftOnly === true"
-                  :indeterminate="gitlabDraftOnly === undefined"
-                  @click.prevent="cycleGitlabDraft"
-                />
-                <span>{{ gitlabDraftOnly === true ? 'Draft MRs only' : gitlabDraftOnly === false ? 'Exclude drafts' : 'Include drafts' }}</span>
-              </label>
+            <div class="filter-item">
+              <label for="gitlab-draft-filter">Draft filter</label>
+              <select id="gitlab-draft-filter" v-model="gitlabDraftFilter">
+                <option value="include">Include drafts</option>
+                <option value="exclude">Exclude drafts</option>
+                <option value="only">Draft MRs only</option>
+              </select>
+            </div>
 
+            <div class="checkbox-filters">
               <label class="checkbox-label">
                 <input type="checkbox" v-model="formData.applyExplicitReviewerFilter" />
                 <span>Explicit reviewer only (exclude team assignments)</span>
@@ -435,7 +434,7 @@ const gitlabReviewer = ref('');
 const gitlabLabels = ref('');
 const gitlabSearch = ref('');
 const gitlabProjects = ref<string[]>([]);
-const gitlabDraftOnly = ref<boolean | undefined>(undefined);
+const gitlabDraftFilter = ref<'include' | 'exclude' | 'only'>('include');
 
 const showRepositorySelector = computed(() =>
   ['scratch', 'repo-specific', 'by-label', 'team-prs'].includes(selectedTemplate.value || '')
@@ -534,17 +533,6 @@ function parseCommaSeparated(input: string): string[] {
     .filter((s) => s.length > 0);
 }
 
-function cycleGitlabDraft(): void {
-  // Cycle: undefined (include all) -> false (exclude drafts) -> true (drafts only) -> undefined
-  if (gitlabDraftOnly.value === undefined) {
-    gitlabDraftOnly.value = false;
-  } else if (gitlabDraftOnly.value === false) {
-    gitlabDraftOnly.value = true;
-  } else {
-    gitlabDraftOnly.value = undefined;
-  }
-}
-
 function buildGitLabQueryTemplate(): string {
   const filter: Record<string, unknown> = {
     type: gitlabQueryType.value,
@@ -571,8 +559,11 @@ function buildGitLabQueryTemplate(): string {
     filter.projectPaths = gitlabProjects.value;
   }
 
-  if (gitlabDraftOnly.value !== undefined) {
-    filter.draft = gitlabDraftOnly.value;
+  // Map draft filter: 'include' = no filter, 'exclude' = false, 'only' = true
+  if (gitlabDraftFilter.value === 'exclude') {
+    filter.draft = false;
+  } else if (gitlabDraftFilter.value === 'only') {
+    filter.draft = true;
   }
 
   if (gitlabSearch.value.trim()) {
