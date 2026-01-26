@@ -91,7 +91,7 @@
     "vitest": "^4.0.17"
   },
   "dependencies": {
-    "@sentry/electron": "^7.6.0",
+    "@sentry/electron": "^7.7.0",
     "@sentry/vue": "^10.36.0",
     "keytar": "^7.9.0",
     "lucide-vue-next": "^0.562.0",
