@@ -7,7 +7,7 @@
  * - REST: https://gitlab.com/api/v4 (or self-hosted)
  */
 
-import { configStore } from '../../stores/configStore';
+import { getApiKey } from '../../stores/configStore';
 
 const GITLAB_GRAPHQL_ENDPOINT = 'https://gitlab.com/api/graphql';
 const GITLAB_REST_ENDPOINT = 'https://gitlab.com/api/v4';
@@ -28,10 +28,10 @@ export class GitLabService {
   }
 
   /**
-   * Get the API token from configStore
+   * Get the API token from secure storage
    */
   private getApiToken(): string {
-    const apiKey = configStore.apiKey;
+    const apiKey = getApiKey();
     if (!apiKey) {
       throw new Error('API token not configured. Please set your GitLab token.');
     }
