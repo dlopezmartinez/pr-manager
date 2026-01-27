@@ -201,7 +201,11 @@ async function validateTokenPermissions(): Promise<void> {
   try {
     const token = getApiKey();
     if (!token) {
+      // No token available - redirect back to token view
+      // This should not happen in normal flow but is a safety fallback
+      console.error('[Auth] No token available in App.vue - redirecting to token view');
       tokenValidationComplete.value = true;
+      routerStore.replace('token');
       return;
     }
 

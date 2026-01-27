@@ -8,8 +8,11 @@
 
     <div class="welcome-content">
       <div class="welcome-header">
-        <div class="logo">
-          <img src="../../assets/icon.svg" width="82" height="82" alt="PR Manager" />
+        <div class="logo-container">
+          <div class="logo">
+            <img src="../../assets/icon.svg" width="82" height="82" alt="PR Manager" />
+          </div>
+          <span class="beta-badge">BETA</span>
         </div>
         <h1>PR Manager</h1>
         <p class="subtitle">Manage your Pull Requests from the menubar</p>
@@ -398,13 +401,32 @@ async function handleContinue() {
   margin-bottom: 32px;
 }
 
+.logo-container {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
 .logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 64px;
   height: 64px;
-  margin-bottom: 16px;
+}
+
+.beta-badge {
+  position: absolute;
+  top: -4px;
+  right: -28px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
 }
 
 .welcome-content h1 {
