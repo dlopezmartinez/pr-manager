@@ -49,7 +49,7 @@ import SubscriptionScreen from './components/SubscriptionScreen.vue';
 import TokenView from './views/TokenView.vue';
 import { authStore } from './stores/authStore';
 import { routerStore, type RouteType } from './stores/routerStore';
-import { initializeConfig, isConfigured as checkIsConfigured, getApiKey } from './stores/configStore';
+import { initializeConfig, isConfigured as checkIsConfigured, getApiKey, loadApiKey } from './stores/configStore';
 
 const HAS_LOGGED_IN_KEY = 'pr-manager-has-logged-in';
 const isMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
@@ -198,6 +198,9 @@ function handleLogout() {
 }
 
 async function handleConfigured() {
+  // Reload API key from Keychain to ensure cache is synchronized
+  // This prevents race conditions where the cache might not be updated
+  await loadApiKey();
   await loadApp();
 }
 
