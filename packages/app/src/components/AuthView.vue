@@ -2,11 +2,23 @@
   <div class="auth-view">
     <div class="auth-container">
       <div class="auth-header">
-        <div class="logo">
-          <img src="../../assets/icon.svg" width="82" height="82" alt="PR Manager" />
+        <div class="logo-container">
+          <div class="logo">
+            <img src="../../assets/icon.svg" width="82" height="82" alt="PR Manager" />
+          </div>
+          <span class="beta-badge">BETA</span>
         </div>
         <h1>PR Manager</h1>
         <p class="tagline">Manage your Pull Requests from the menubar</p>
+      </div>
+
+      <!-- macOS Keychain Warning Banner -->
+      <div v-if="isMac" class="keychain-banner">
+        <KeyRound :size="16" />
+        <div>
+          <strong>Secure Storage</strong>
+          <p>Your credentials will be stored securely in macOS Keychain. You'll be prompted to allow access.</p>
+        </div>
       </div>
 
       <div class="auth-form">
@@ -161,9 +173,9 @@
       <div class="auth-footer">
         <p>
           By continuing, you agree to our
-          <a href="#" @click.prevent="openExternal('https://prmanager.app/terms')">Terms of Service</a>
+          <a href="#" @click.prevent="openExternalUrl('https://prmanager.app/terms')">Terms of Service</a>
           and
-          <a href="#" @click.prevent="openExternal('https://prmanager.app/privacy')">Privacy Policy</a>
+          <a href="#" @click.prevent="openExternalUrl('https://prmanager.app/privacy')">Privacy Policy</a>
         </p>
       </div>
     </div>
@@ -172,13 +184,18 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { KeyRound } from 'lucide-vue-next';
 import { authStore } from '../stores/authStore';
 import { authService } from '../services/authService';
 
 const emit = defineEmits<{
   (e: 'authenticated'): void;
+  (e: 'keychain-denied'): void;
 }>();
 
+const isMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
+
+// Auth form state
 const mode = ref<'login' | 'signup' | 'forgot-password'>('login');
 const email = ref('');
 const password = ref('');
@@ -191,6 +208,18 @@ function switchMode(newMode: 'login' | 'signup' | 'forgot-password') {
   mode.value = newMode;
   error.value = '';
   successMessage.value = '';
+}
+
+function isKeychainError(err: unknown): boolean {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return msg.includes('keychain') ||
+           msg.includes('denied') ||
+           msg.includes('canceled') ||
+           msg.includes('encryption') ||
+           msg.includes('not available');
+  }
+  return false;
 }
 
 async function handleLogin() {
@@ -206,6 +235,11 @@ async function handleLogin() {
     await authStore.login(email.value, password.value);
     emit('authenticated');
   } catch (err) {
+    // Check if it's a Keychain access error (macOS)
+    if (isMac && isKeychainError(err)) {
+      emit('keychain-denied');
+      return;
+    }
     error.value = err instanceof Error ? err.message : 'Failed to sign in';
   } finally {
     isLoading.value = false;
@@ -230,6 +264,11 @@ async function handleSignup() {
     await authStore.signup(email.value, password.value, name.value || undefined);
     emit('authenticated');
   } catch (err) {
+    // Check if it's a Keychain access error (macOS)
+    if (isMac && isKeychainError(err)) {
+      emit('keychain-denied');
+      return;
+    }
     error.value = err instanceof Error ? err.message : 'Failed to create account';
   } finally {
     isLoading.value = false;
@@ -249,15 +288,14 @@ async function handleForgotPassword() {
   try {
     await authService.forgotPassword(email.value);
     successMessage.value = 'If an account exists, a reset email will be sent. Check your inbox.';
-  } catch (err) {
-    // Still show success message to prevent email enumeration
+  } catch {
     successMessage.value = 'If an account exists, a reset email will be sent. Check your inbox.';
   } finally {
     isLoading.value = false;
   }
 }
 
-function openExternal(url: string) {
+function openExternalUrl(url: string) {
   window.electronAPI.shell.openExternal(url);
 }
 </script>
@@ -279,7 +317,13 @@ function openExternal(url: string) {
 
 .auth-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+}
+
+.logo-container {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 16px;
 }
 
 .logo {
@@ -289,7 +333,20 @@ function openExternal(url: string) {
   width: 64px;
   height: 64px;
   color: var(--color-text-inverted);
-  margin-bottom: 16px;
+}
+
+.beta-badge {
+  position: absolute;
+  bottom: -8px;
+  right: -36px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
 }
 
 .auth-header h1 {
@@ -303,6 +360,39 @@ function openExternal(url: string) {
   font-size: 14px;
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+/* Keychain Warning Banner */
+.keychain-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info);
+  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
+}
+
+.keychain-banner > svg {
+  flex-shrink: 0;
+  color: var(--color-info);
+  margin-top: 2px;
+}
+
+.keychain-banner strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.keychain-banner p {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.4;
 }
 
 .auth-form {
@@ -364,6 +454,9 @@ function openExternal(url: string) {
 }
 
 .error-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 10px 12px;
   background: var(--color-error-bg);
   border: 1px solid var(--color-error);

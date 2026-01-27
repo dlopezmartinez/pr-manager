@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         'show-notification',
         'set-syncing',
         'open-external',
+        'relaunch-app',
       ];
 
       if (validChannels.includes(channel)) {
@@ -119,6 +120,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setUser: (user: { id: string; email: string; name?: string }): Promise<boolean> => {
       return ipcRenderer.invoke('auth:set-user', user);
     },
+    initUpdateToken: (): Promise<boolean> => {
+      return ipcRenderer.invoke('auth:init-update-token');
+    },
+  },
+
+  // Keychain-specific APIs for macOS
+  keychain: {
+    // Check if credentials file exists (without triggering Keychain prompt)
+    hasStoredCredentials: (): Promise<boolean> => {
+      return ipcRenderer.invoke('keychain:has-stored-credentials');
+    },
+    // Verify Keychain access works (WILL trigger prompt if needed)
+    verifyAccess: (): Promise<{ success: boolean; error?: string }> => {
+      return ipcRenderer.invoke('keychain:verify-access');
+    },
+    // Check if encryption is available
+    isEncryptionAvailable: (): Promise<boolean> => {
+      return ipcRenderer.invoke('keychain:is-encryption-available');
+    },
   },
 });
 
@@ -126,6 +146,11 @@ export interface AuthUser {
   id: string;
   email: string;
   name?: string;
+}
+
+export interface KeychainVerifyResult {
+  success: boolean;
+  error?: string;
 }
 
 export interface ElectronAPI {
@@ -166,6 +191,12 @@ export interface ElectronAPI {
     clearRefreshToken: () => Promise<boolean>;
     getUser: () => Promise<AuthUser | null>;
     setUser: (user: AuthUser) => Promise<boolean>;
+    initUpdateToken: () => Promise<boolean>;
+  };
+  keychain: {
+    hasStoredCredentials: () => Promise<boolean>;
+    verifyAccess: () => Promise<KeychainVerifyResult>;
+    isEncryptionAvailable: () => Promise<boolean>;
   };
 }
 

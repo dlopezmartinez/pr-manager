@@ -1,4 +1,80 @@
 // PR Manager Desktop App - Main Process
+
+// =============================================================================
+// SQUIRREL WINDOWS EVENT HANDLING
+// This MUST be at the very top, before any other code runs.
+// Squirrel passes special command-line arguments during install/update/uninstall.
+// =============================================================================
+if (process.platform === 'win32') {
+  const squirrelEvent = process.argv[1];
+
+  if (squirrelEvent?.startsWith('--squirrel-')) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { spawn } = require('child_process');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const path = require('path');
+
+    const appFolder = path.resolve(process.execPath, '..');
+    const rootFolder = path.resolve(appFolder, '..');
+    const updateExe = path.join(rootFolder, 'Update.exe');
+    const exeName = path.basename(process.execPath);
+
+    const runUpdateExe = (args: string[]): Promise<void> => {
+      return new Promise((resolve) => {
+        const child = spawn(updateExe, args, { detached: true });
+        child.on('close', () => resolve());
+      });
+    };
+
+    const handleSquirrelEvent = async (): Promise<boolean> => {
+      switch (squirrelEvent) {
+        case '--squirrel-install':
+        case '--squirrel-updated':
+          // Create desktop and start menu shortcuts
+          await runUpdateExe([
+            '--createShortcut',
+            exeName,
+            '--shortcut-locations',
+            'Desktop,StartMenu'
+          ]);
+          return true;
+
+        case '--squirrel-uninstall':
+          // Remove shortcuts
+          await runUpdateExe([
+            '--removeShortcut',
+            exeName,
+            '--shortcut-locations',
+            'Desktop,StartMenu'
+          ]);
+          return true;
+
+        case '--squirrel-obsolete':
+          // Called on the old version when updating to a new version
+          return true;
+
+        default:
+          return false;
+      }
+    };
+
+    handleSquirrelEvent().then((shouldQuit) => {
+      if (shouldQuit) {
+        process.exit(0);
+      }
+    });
+
+    // Exit immediately for squirrel events - don't continue loading the app
+    if (squirrelEvent !== '--squirrel-firstrun') {
+      // For install/update/uninstall, we need to exit
+      // The promise above will handle the actual exit after shortcuts are created
+      // But we need to prevent the rest of the app from loading
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      require('electron').app.quit();
+    }
+  }
+}
+
 import { initSentryMain } from './lib/sentry';
 initSentryMain();
 
@@ -19,12 +95,15 @@ import {
   getNotificationConfig,
   shouldQuitOnAllWindowsClosed,
   supportsTrayTitle,
+  isMac,
 } from './utils/platform';
 import {
   getSecureValue,
   setSecureValue,
   deleteSecureValue,
   isEncryptionAvailable,
+  hasStoredCredentials,
+  verifyKeychainAccess,
 } from './utils/secureStorage';
 import { validateToken, TokenValidationResult } from './utils/tokenValidation';
 
@@ -142,11 +221,28 @@ function createWindow(): void {
     if (!isQuitting) {
       event.preventDefault();
       mainWindow?.hide();
+      // On macOS, hide from Dock when window is closed (but keep process alive in menu bar)
+      if (isMac) {
+        app.dock?.hide();
+      }
     }
   });
 
   mainWindow.once('ready-to-show', () => {
     showWindowCentered();
+  });
+
+  // Debug: log if renderer crashes
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('[Main] Renderer process gone:', details.reason, details.exitCode);
+  });
+
+  mainWindow.webContents.on('unresponsive', () => {
+    console.error('[Main] Renderer became unresponsive');
+  });
+
+  mainWindow.webContents.on('responsive', () => {
+    console.log('[Main] Renderer became responsive again');
   });
 }
 
@@ -155,6 +251,10 @@ function toggleWindow(): void {
 
   if (mainWindow!.isVisible()) {
     mainWindow!.hide();
+    // On macOS, hide from Dock when window is hidden via toggle
+    if (isMac) {
+      app.dock?.hide();
+    }
   } else {
     showWindowCentered();
   }
@@ -162,6 +262,11 @@ function toggleWindow(): void {
 
 function showWindowCentered(): void {
   if (!isWindowAvailable()) return;
+
+  // On macOS, show in Dock when window is shown
+  if (isMac) {
+    app.dock?.show();
+  }
 
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
@@ -240,6 +345,15 @@ function setupIpcHandlers(): void {
     return getSecureValue(AUTH_TOKEN_KEY);
   });
 
+  ipcMain.handle('auth:init-update-token', async () => {
+    // Called by renderer on macOS after showing the Keychain hint
+    const storedToken = await getSecureValue(AUTH_TOKEN_KEY);
+    if (storedToken) {
+      setUpdateToken(storedToken);
+    }
+    return true;
+  });
+
   ipcMain.handle('auth:set-token', async (_, token: string) => {
     setUpdateToken(token);
     return setSecureValue(AUTH_TOKEN_KEY, token);
@@ -282,12 +396,48 @@ function setupIpcHandlers(): void {
     return setSecureValue(AUTH_USER_KEY, JSON.stringify(user));
   });
 
+  // Keychain-specific handlers (primarily for macOS)
+  ipcMain.handle('keychain:has-stored-credentials', () => {
+    // Check if credentials file exists WITHOUT triggering Keychain prompt
+    return hasStoredCredentials();
+  });
+
+  ipcMain.handle('keychain:verify-access', () => {
+    // Verify Keychain access works - WILL trigger prompt if needed
+    try {
+      return verifyKeychainAccess();
+    } catch (error) {
+      console.error('[Main] Error in keychain:verify-access:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  });
+
+  ipcMain.handle('keychain:is-encryption-available', () => {
+    try {
+      return isEncryptionAvailable();
+    } catch (error) {
+      console.error('[Main] Error checking encryption availability:', error);
+      return false;
+    }
+  });
+
   ipcMain.handle('get-app-version', () => {
     return app.getVersion();
   });
 
   ipcMain.on('hide-window', () => {
-    if (isWindowAvailable()) mainWindow!.hide();
+    if (isWindowAvailable()) {
+      mainWindow!.hide();
+      // On macOS, hide from Dock when window is hidden
+      if (isMac) {
+        app.dock?.hide();
+      }
+    }
+  });
+
+  ipcMain.on('relaunch-app', () => {
+    app.relaunch();
+    app.exit(0);
   });
 
   ipcMain.on('window-minimize', () => {
@@ -435,11 +585,15 @@ app.on('ready', async () => {
   createTray();
   setupIpcHandlers();
 
-  initAutoUpdater(mainWindow);
+  initAutoUpdater();
 
-  const storedToken = await getSecureValue(AUTH_TOKEN_KEY);
-  if (storedToken) {
-    setUpdateToken(storedToken);
+  // On macOS, defer Keychain access to let UI show first with a hint
+  // The renderer will trigger this via IPC after showing the loading screen
+  if (process.platform !== 'darwin') {
+    const storedToken = await getSecureValue(AUTH_TOKEN_KEY);
+    if (storedToken) {
+      setUpdateToken(storedToken);
+    }
   }
 });
 

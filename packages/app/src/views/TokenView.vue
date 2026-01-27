@@ -8,8 +8,11 @@
 
     <div class="welcome-content">
       <div class="welcome-header">
-        <div class="logo">
-          <img src="../../assets/icon.svg" width="82" height="82" alt="PR Manager" />
+        <div class="logo-container">
+          <div class="logo">
+            <img src="../../assets/icon.svg" width="82" height="82" alt="PR Manager" />
+          </div>
+          <span class="beta-badge">BETA</span>
         </div>
         <h1>PR Manager</h1>
         <p class="subtitle">Manage your Pull Requests from the menubar</p>
@@ -110,7 +113,7 @@
                     <span class="permission-badge read-write">Write</span>
                     <span class="optional-badge">Optional</span>
                   </div>
-                  <p>Write access enables actions like merging PRs, approving reviews, and adding comments. Without write permissions, you can still view all PRs but cannot perform actions.</p>
+                  <p>Write access enables actions like merging PRs, approving reviews, and adding comments.</p>
                 </div>
                 <div class="permission-item required">
                   <div class="permission-header">
@@ -138,7 +141,7 @@
                     <span class="permission-badge read-write">Write</span>
                     <span class="optional-badge">Optional</span>
                   </div>
-                  <p>Full API access enables actions like merging MRs, approving reviews, and adding comments. Without this, you can still view all MRs but cannot perform actions.</p>
+                  <p>Full API access enables actions like merging MRs, approving reviews, and adding comments.</p>
                 </div>
               </template>
 
@@ -147,7 +150,7 @@
                 <Shield :size="14" :stroke-width="2" />
                 <div>
                   <strong>Your code and organizations are safe</strong>
-                  <p>PR Manager can only interact with pull requests (view, merge, approve, comment). It cannot push code, modify repository settings, or change organization configurations. Your token is stored locally and never sent to our servers.</p>
+                  <p>PR Manager can only interact with pull requests. It cannot push code or modify repository settings.</p>
                 </div>
               </div>
             </div>
@@ -166,9 +169,9 @@
           </div>
         </div>
 
-        <div v-if="error" class="error-message">
+        <div v-if="tokenError" class="error-message">
           <AlertCircle :size="14" :stroke-width="2" />
-          {{ error }}
+          {{ tokenError }}
         </div>
 
         <div class="actions">
@@ -196,20 +199,24 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { GitMerge, Eye, EyeOff, Github, AlertCircle, ArrowRight, Lock, Info, ChevronDown, Shield } from 'lucide-vue-next';
+import {
+  Info, AlertCircle, Eye, EyeOff, Github,
+  GitMerge, ArrowRight, Lock, ChevronDown, Shield
+} from 'lucide-vue-next';
+import TitleBar from '../components/TitleBar.vue';
 import { updateConfig, saveApiKey } from '../stores/configStore';
-import TitleBar from './TitleBar.vue';
+import { openExternal } from '../utils/electron';
 import type { ProviderType } from '../model/provider-types';
 
 const emit = defineEmits<{
   (e: 'configured'): void;
 }>();
 
+// Token input state
 const providers = [
   { type: 'github' as ProviderType, name: 'GitHub', icon: Github },
   { type: 'gitlab' as ProviderType, name: 'GitLab', icon: GitMerge },
 ];
-
 const selectedProvider = ref<ProviderType>('github');
 const gitlabUrl = ref('');
 const apiKey = ref('');
@@ -217,9 +224,7 @@ const username = ref('');
 const showToken = ref(false);
 const showPermissionsInfo = ref(false);
 const loading = ref(false);
-const error = ref('');
-
-import { openExternal } from '../utils/electron';
+const tokenError = ref('');
 
 const tokenLabel = computed(() => {
   return selectedProvider.value === 'github'
@@ -271,14 +276,8 @@ async function validateGitHubToken(token: string): Promise<TokenValidationResult
     const data = await response.json();
     const valid = !!data.data?.viewer?.login;
 
-    // Check scopes from response headers
-    // GitHub returns X-OAuth-Scopes header with token scopes
     const scopes = response.headers.get('X-OAuth-Scopes') || '';
     const scopeList = scopes.split(',').map(s => s.trim().toLowerCase());
-
-    // Check if token has write access to repos
-    // 'repo' scope includes full control (read+write)
-    // 'public_repo' also includes write access to public repos
     const hasWritePermissions = scopeList.some(scope =>
       scope === 'repo' || scope === 'public_repo'
     );
@@ -310,33 +309,22 @@ async function validateGitLabToken(token: string, baseUrl?: string): Promise<Tok
     const data = await response.json();
     const valid = !!data.data?.currentUser?.username;
 
-    // For GitLab, check token scopes via REST API
-    // GitLab Personal Access Tokens have scopes like 'api', 'read_api', 'read_repository'
     let hasWritePermissions = false;
-
     try {
       const tokenInfoResponse = await fetch(`${apiBase}/api/v4/personal_access_tokens/self`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
 
       if (tokenInfoResponse.ok) {
         const tokenInfo = await tokenInfoResponse.json();
         const scopes: string[] = tokenInfo.scopes || [];
-
-        // 'api' scope provides full read/write access
-        // 'write_repository' also provides write access
         hasWritePermissions = scopes.some(scope =>
           scope === 'api' || scope === 'write_repository'
         );
       } else {
-        // If we can't check scopes, assume write permissions if the token is valid
-        // This handles cases like OAuth tokens or older GitLab versions
         hasWritePermissions = true;
       }
     } catch {
-      // If scope check fails, default to assuming write permissions
       hasWritePermissions = true;
     }
 
@@ -350,7 +338,7 @@ async function handleContinue() {
   if (!apiKey.value) return;
 
   loading.value = true;
-  error.value = '';
+  tokenError.value = '';
 
   let validationResult: TokenValidationResult;
 
@@ -361,20 +349,18 @@ async function handleContinue() {
   }
 
   if (!validationResult.valid) {
-    error.value = 'Invalid token. Please check and try again.';
+    tokenError.value = 'Invalid token. Please check and try again.';
     loading.value = false;
     return;
   }
 
-  // Save API key to secure storage
   const saved = await saveApiKey(apiKey.value);
   if (!saved) {
-    error.value = 'Failed to save token securely. Please try again.';
+    tokenError.value = 'Failed to save token securely. Please try again.';
     loading.value = false;
     return;
   }
 
-  // Save other config (non-sensitive) including write permissions
   updateConfig({
     providerType: selectedProvider.value,
     gitlabUrl: selectedProvider.value === 'gitlab' ? (gitlabUrl.value || undefined) : undefined,
@@ -415,16 +401,35 @@ async function handleContinue() {
   margin-bottom: 32px;
 }
 
+.logo-container {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
 .logo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 64px;
   height: 64px;
-  margin-bottom: 16px;
 }
 
-h1 {
+.beta-badge {
+  position: absolute;
+  bottom: -8px;
+  right: -36px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+}
+
+.welcome-content h1 {
   font-size: 24px;
   font-weight: 600;
   color: var(--color-text-primary);
@@ -470,7 +475,7 @@ h1 {
   margin-top: var(--spacing-md);
 }
 
-label {
+.form-group label {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-primary);
@@ -509,7 +514,7 @@ label {
 
 .provider-btn.active {
   border-color: var(--color-accent-primary);
-  background: var(--color-accent-light);
+  background: var(--color-accent-lighter);
   color: var(--color-accent-primary);
 }
 
@@ -538,7 +543,7 @@ input {
 
 input:focus {
   border-color: var(--color-accent-primary);
-  box-shadow: 0 0 0 2px var(--color-accent-light);
+  box-shadow: 0 0 0 2px var(--color-accent-lighter);
 }
 
 input::placeholder {
@@ -725,7 +730,7 @@ input::placeholder {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-accent-primary);
-  background: var(--color-accent-light);
+  background: var(--color-accent-lighter);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
 }
@@ -745,8 +750,8 @@ input::placeholder {
 }
 
 .permission-badge.read-write {
-  background: var(--color-warning-bg, rgba(245, 158, 11, 0.1));
-  color: var(--color-warning, #f59e0b);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 .required-badge,
@@ -760,22 +765,22 @@ input::placeholder {
 }
 
 .required-badge {
-  background: var(--color-error-bg, rgba(239, 68, 68, 0.1));
-  color: var(--color-error, #ef4444);
+  background: var(--color-error-bg);
+  color: var(--color-error);
 }
 
 .optional-badge {
-  background: var(--color-info-bg, rgba(59, 130, 246, 0.1));
-  color: var(--color-info, #3b82f6);
+  background: var(--color-info-bg);
+  color: var(--color-info);
 }
 
 .permission-item.optional {
-  border-left: 2px solid var(--color-info, #3b82f6);
+  border-left: 2px solid var(--color-info);
   padding-left: calc(var(--spacing-sm) - 2px);
 }
 
 .permission-item.required {
-  border-left: 2px solid var(--color-error, #ef4444);
+  border-left: 2px solid var(--color-error);
   padding-left: calc(var(--spacing-sm) - 2px);
 }
 
@@ -789,8 +794,8 @@ input::placeholder {
 .security-note {
   display: flex;
   gap: var(--spacing-sm);
-  background: var(--color-info-bg, rgba(59, 130, 246, 0.1));
-  border: 1px solid var(--color-info, rgba(59, 130, 246, 0.3));
+  background: var(--color-info-bg);
+  border: 1px solid var(--color-info);
   border-radius: var(--radius-md);
   padding: var(--spacing-sm);
   margin-top: var(--spacing-xs);
@@ -798,7 +803,7 @@ input::placeholder {
 
 .security-note > svg {
   flex-shrink: 0;
-  color: var(--color-info, #3b82f6);
+  color: var(--color-info);
   margin-top: 2px;
 }
 

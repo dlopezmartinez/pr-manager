@@ -112,6 +112,14 @@ jobs:
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
           NEW_PATCH=$((PATCH + 1))
           NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+          # Check if tag already exists and find next available version
+          while git tag -l "v${NEW_VERSION}" | grep -q .; do
+            echo "Tag v${NEW_VERSION} already exists, incrementing..."
+            NEW_PATCH=$((NEW_PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          done
+
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Version bump: $CURRENT → $NEW_VERSION"
 
@@ -214,12 +222,167 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
   # =============================================================================
-  # Build and upload app binaries (when app changed)
+  # Check for PR artifacts (when app changed)
+  # =============================================================================
+  check-pr-artifacts:
+    name: "Check PR Artifacts"
+    needs: [detect-changes, patch-release]
+    if: needs.detect-changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      has_artifacts: ${{ steps.check.outputs.has_artifacts }}
+      pr_sha: ${{ steps.check.outputs.pr_sha }}
+      run_id: ${{ steps.check.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: "Find PR SHA from merge commit"
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the second parent of the merge commit (the PR branch)
+          PR_SHA=$(git rev-parse HEAD^2 2>/dev/null || echo "")
+
+          if [ -z "$PR_SHA" ]; then
+            echo "Not a merge commit or no second parent found"
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "PR SHA: $PR_SHA"
+          echo "pr_sha=$PR_SHA" >> $GITHUB_OUTPUT
+
+          # Find the workflow run that built artifacts for this PR SHA
+          echo "Searching for artifacts from PR build..."
+
+          # List recent workflow runs for the App workflow
+          RUNS=$(gh api "/repos/${{ github.repository }}/actions/workflows/app.yml/runs?per_page=20&status=success" -q '.workflow_runs[] | "\(.id) \(.head_sha)"')
+
+          RUN_ID=""
+          while IFS= read -r line; do
+            run_id=$(echo "$line" | awk '{print $1}')
+            sha=$(echo "$line" | awk '{print $2}')
+            if [ "$sha" == "$PR_SHA" ]; then
+              RUN_ID=$run_id
+              break
+            fi
+          done <<< "$RUNS"
+
+          if [ -z "$RUN_ID" ]; then
+            echo "No workflow run found for PR SHA $PR_SHA"
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Found workflow run: $RUN_ID"
+
+          # Check if this run has the artifacts we need
+          ARTIFACTS=$(gh api "/repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" -q '.artifacts[].name')
+
+          HAS_MACOS=$(echo "$ARTIFACTS" | grep -c "app-macos-$PR_SHA" || echo "0")
+          HAS_WINDOWS=$(echo "$ARTIFACTS" | grep -c "app-windows-$PR_SHA" || echo "0")
+          HAS_LINUX=$(echo "$ARTIFACTS" | grep -c "app-linux-$PR_SHA" || echo "0")
+
+          echo "Found artifacts - macOS: $HAS_MACOS, Windows: $HAS_WINDOWS, Linux: $HAS_LINUX"
+
+          if [ "$HAS_MACOS" -gt 0 ] && [ "$HAS_WINDOWS" -gt 0 ] && [ "$HAS_LINUX" -gt 0 ]; then
+            echo "✅ All PR artifacts found!"
+            echo "has_artifacts=true" >> $GITHUB_OUTPUT
+            echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Some artifacts missing, will need to build"
+            echo "has_artifacts=false" >> $GITHUB_OUTPUT
+          fi
+
+  # =============================================================================
+  # Use PR artifacts (skip build if artifacts exist)
+  # =============================================================================
+  use-pr-artifacts:
+    name: "Use PR Artifacts"
+    needs: [detect-changes, patch-release, check-pr-artifacts]
+    if: needs.detect-changes.outputs.app == 'true' && needs.check-pr-artifacts.outputs.has_artifacts == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Download macOS artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          name: app-macos-${{ needs.check-pr-artifacts.outputs.pr_sha }}
+          path: artifacts/macos
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ needs.check-pr-artifacts.outputs.run_id }}
+
+      - name: "Download Windows artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          name: app-windows-${{ needs.check-pr-artifacts.outputs.pr_sha }}
+          path: artifacts/windows
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ needs.check-pr-artifacts.outputs.run_id }}
+
+      - name: "Download Linux artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          name: app-linux-${{ needs.check-pr-artifacts.outputs.pr_sha }}
+          path: artifacts/linux
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ needs.check-pr-artifacts.outputs.run_id }}
+
+      - name: "List downloaded artifacts"
+        run: |
+          echo "Downloaded artifacts:"
+          find artifacts -type f | head -50
+          echo ""
+          echo "Preparing for release upload..."
+
+      - name: "Upload macOS to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.patch-release.outputs.version }}
+          files: |
+            artifacts/macos/*.dmg
+            artifacts/macos/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "Upload Windows to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.patch-release.outputs.version }}
+          files: |
+            artifacts/windows/*.exe
+            artifacts/windows/*.nupkg
+            artifacts/windows/RELEASES
+            artifacts/windows/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "Upload Linux to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.patch-release.outputs.version }}
+          files: |
+            artifacts/linux/*.deb
+            artifacts/linux/*.rpm
+            artifacts/linux/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "Summary"
+        run: |
+          echo "✅ Successfully reused PR artifacts for release v${{ needs.patch-release.outputs.version }}"
+          echo "PR SHA: ${{ needs.check-pr-artifacts.outputs.pr_sha }}"
+          echo "Workflow Run: ${{ needs.check-pr-artifacts.outputs.run_id }}"
+
+  # =============================================================================
+  # Build and upload app binaries (when app changed AND no PR artifacts)
   # =============================================================================
   build-app-macos:
     name: "Build macOS"
-    needs: [detect-changes, patch-release]
-    if: needs.detect-changes.outputs.app == 'true'
+    needs: [detect-changes, patch-release, check-pr-artifacts]
+    if: needs.detect-changes.outputs.app == 'true' && needs.check-pr-artifacts.outputs.has_artifacts != 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -232,6 +395,46 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      - name: "Import Apple Certificate"
+        id: apple-cert
+        continue-on-error: true
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE_BASE64" ]; then
+            echo "⚠️ Apple certificate not configured, skipping signing"
+            echo "identity=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $RUNNER_TEMP/certificate.p12 \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 \
+            -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Auto-detect the signing identity from the imported certificate
+          IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+
+          if [ -n "$IDENTITY" ]; then
+            echo "✅ Apple certificate imported"
+            echo "✅ Detected identity: $IDENTITY"
+            echo "identity=$IDENTITY" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Certificate imported but no Developer ID Application identity found"
+            echo "identity=" >> $GITHUB_OUTPUT
+          fi
+
       - name: "Install dependencies"
         run: npm ci
 
@@ -241,6 +444,35 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          APPLE_IDENTITY: ${{ steps.apple-cert.outputs.identity }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: "Notarize macOS App"
+        if: steps.apple-cert.outputs.identity != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "⚠️ Apple notarization not configured, skipping"
+            exit 0
+          fi
+
+          DMG_PATH=$(find packages/app/out/make -name "*.dmg" | head -1)
+          if [ -n "$DMG_PATH" ]; then
+            echo "Notarizing: $DMG_PATH"
+            xcrun notarytool submit "$DMG_PATH" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_ID_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+
+            xcrun stapler staple "$DMG_PATH"
+            echo "✅ Notarization complete"
+          fi
 
       - name: "Upload to release"
         uses: softprops/action-gh-release@v1
@@ -254,8 +486,8 @@ jobs:
 
   build-app-windows:
     name: "Build Windows"
-    needs: [detect-changes, patch-release]
-    if: needs.detect-changes.outputs.app == 'true'
+    needs: [detect-changes, patch-release, check-pr-artifacts]
+    if: needs.detect-changes.outputs.app == 'true' && needs.check-pr-artifacts.outputs.has_artifacts != 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -278,6 +510,36 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
 
+      - name: "Sign Windows Executable with SignPath"
+        id: sign
+        continue-on-error: true
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: PR_Manager_App
+          signing-policy-slug: release
+          artifact-configuration-slug: exe_config
+          github-artifact-id: unsigned-windows-exe
+          wait-for-completion: true
+          output-artifact-directory: packages/app/out/make/squirrel.windows/x64/signed
+
+      - name: "Prepare artifacts for upload"
+        shell: pwsh
+        run: |
+          $signedDir = "packages/app/out/make/squirrel.windows/x64/signed"
+          $targetDir = "packages/app/out/make/squirrel.windows/x64"
+
+          if (Test-Path $signedDir) {
+            Write-Host "✅ Using signed executables"
+            Get-ChildItem -Path $signedDir -Filter "*.exe" | ForEach-Object {
+              Copy-Item $_.FullName -Destination $targetDir -Force
+              Write-Host "  Copied signed: $($_.Name)"
+            }
+          } else {
+            Write-Host "⚠️ SignPath signing skipped or failed, using unsigned executables"
+          }
+
       - name: "Upload to release"
         uses: softprops/action-gh-release@v1
         with:
@@ -292,8 +554,8 @@ jobs:
 
   build-app-linux:
     name: "Build Linux"
-    needs: [detect-changes, patch-release]
-    if: needs.detect-changes.outputs.app == 'true'
+    needs: [detect-changes, patch-release, check-pr-artifacts]
+    if: needs.detect-changes.outputs.app == 'true' && needs.check-pr-artifacts.outputs.has_artifacts != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -450,6 +712,40 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      - name: "Import Apple Certificate"
+        id: apple-cert-fallback
+        continue-on-error: true
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE_BASE64" ]; then
+            echo "⚠️ Apple certificate not configured, skipping signing"
+            echo "identity=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Auto-detect the signing identity from the imported certificate
+          IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+
+          if [ -n "$IDENTITY" ]; then
+            echo "✅ Apple certificate imported"
+            echo "✅ Detected identity: $IDENTITY"
+            echo "identity=$IDENTITY" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Certificate imported but no Developer ID Application identity found"
+            echo "identity=" >> $GITHUB_OUTPUT
+          fi
+
       - name: "Install dependencies"
         run: npm ci
 
@@ -459,6 +755,29 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          APPLE_IDENTITY: ${{ steps.apple-cert-fallback.outputs.identity }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: "Notarize macOS App"
+        if: steps.apple-cert-fallback.outputs.identity != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "⚠️ Apple notarization not configured, skipping"
+            exit 0
+          fi
+          DMG_PATH=$(find packages/app/out/make -name "*.dmg" | head -1)
+          if [ -n "$DMG_PATH" ]; then
+            echo "Notarizing: $DMG_PATH"
+            xcrun notarytool submit "$DMG_PATH" --apple-id "$APPLE_ID" --password "$APPLE_ID_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+            xcrun stapler staple "$DMG_PATH"
+            echo "✅ Notarization complete"
+          fi
 
       - name: "Upload to release"
         uses: softprops/action-gh-release@v1
@@ -495,6 +814,30 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: "Sign Windows Executable with SignPath"
+        continue-on-error: true
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: PR_Manager_App
+          signing-policy-slug: release
+          artifact-configuration-slug: exe_config
+          github-artifact-id: unsigned-windows-exe
+          wait-for-completion: true
+          output-artifact-directory: packages/app/out/make/squirrel.windows/x64/signed
+
+      - name: "Prepare signed artifacts"
+        shell: pwsh
+        run: |
+          $signedDir = "packages/app/out/make/squirrel.windows/x64/signed"
+          $targetDir = "packages/app/out/make/squirrel.windows/x64"
+          if (Test-Path $signedDir) {
+            Get-ChildItem -Path $signedDir -Filter "*.exe" | ForEach-Object {
+              Copy-Item $_.FullName -Destination $targetDir -Force
+            }
+          }
 
       - name: "Upload to release"
         uses: softprops/action-gh-release@v1

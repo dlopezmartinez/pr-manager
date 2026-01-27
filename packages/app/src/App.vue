@@ -1,29 +1,8 @@
 <template>
   <ErrorBoundary fallback-message="An error occurred" @error="handleGlobalError">
     <div class="app-container">
-      <div v-if="!authInitialized" class="loading-container">
-        <div class="loading-spinner"></div>
-        <p>Loading...</p>
-      </div>
-
-      <AuthView
-        v-else-if="!isAuthenticated"
-        @authenticated="handleAuthenticated"
-      />
-
-      <SubscriptionScreen
-        v-else-if="needsSubscription"
-        @subscribed="handleSubscribed"
-        @logout="handleAuthLogout"
-      />
-
-      <WelcomeScreen
-        v-else-if="!isConfigured"
-        @configured="handleConfigured"
-      />
-
       <MissingScopesScreen
-        v-else-if="showMissingScopes"
+        v-if="showMissingScopes"
         :missing-scopes="missingScopes"
         :current-scopes="currentScopes"
         @validated="handleTokenValidated"
@@ -137,28 +116,24 @@ import { useAuthHealthPolling } from './composables/useAuthHealthPolling';
 import { useViewState, getAllViewStates, clearAllViewStates } from './composables/useViewState';
 import { useTheme } from './composables/useTheme';
 import { ViewAdapter } from './adapters/ViewAdapter';
-import { configStore, isConfigured as checkConfigured } from './stores/configStore';
+import { configStore } from './stores/configStore';
 import { viewStore, activeView, addCustomView, isViewVisited, markViewAsVisited } from './stores/viewStore';
 import { authStore } from './stores/authStore';
-import { notificationManager } from './managers/NotificationManager';
-import { updatePrCount, setSyncing } from './utils/electron';
+import { routerStore } from './stores/routerStore';
+import { updatePrCount, setSyncing, showNotification, initUpdateToken, validateToken } from './utils/electron';
 import ErrorBoundary from './components/ErrorBoundary.vue';
 import TitleBar from './components/TitleBar.vue';
 import ViewTabs from './components/ViewTabs.vue';
 import ViewContainer from './components/ViewContainer.vue';
 import ViewManager from './components/ViewManager.vue';
 import ViewEditorDialog from './components/ViewEditorDialog.vue';
-import WelcomeScreen from './components/WelcomeScreen.vue';
 import SettingsScreen from './components/SettingsScreen.vue';
 import MissingScopesScreen from './components/MissingScopesScreen.vue';
 import InAppNotification from './components/InAppNotification.vue';
 import NotificationInbox from './components/NotificationInbox.vue';
 import PinnedPRsView from './components/PinnedPRsView.vue';
-import AuthView from './components/AuthView.vue';
-import SubscriptionScreen from './components/SubscriptionScreen.vue';
 import TrialBanner from './components/TrialBanner.vue';
 import AdminDashboard from './components/AdminDashboard.vue';
-import { validateToken } from './utils/electron';
 import { getApiKey } from './stores/configStore';
 import { isNotificationsView, isPinnedView } from './config/default-views';
 import { initializeFollowUpService } from './services/FollowUpService';
@@ -168,14 +143,9 @@ import type { ViewConfig } from './model/view-types';
 
 useTheme();
 
-const authInitialized = computed(() => authStore.state.initialized);
-const isAuthenticated = computed(() => authStore.state.isAuthenticated);
-const needsSubscription = computed(() => authStore.needsSubscription.value);
-
 const provider = useGitProvider();
 const viewAdapter = new ViewAdapter(provider.pullRequests);
 
-const isConfigured = computed(() => checkConfigured());
 const showSettings = ref(false);
 const showViewEditor = ref(false);
 const showAdminDashboard = ref(false);
@@ -185,7 +155,7 @@ const tokenValidationComplete = ref(false);
 const missingScopes = ref<string[]>([]);
 const currentScopes = ref<string[]>([]);
 const showMissingScopes = computed(() =>
-  isConfigured.value && tokenValidationComplete.value && missingScopes.value.length > 0
+  tokenValidationComplete.value && missingScopes.value.length > 0
 );
 
 const currentViewState = computed(() => useViewState(activeView.value.id));
@@ -209,23 +179,20 @@ const { isPolling, nextPollIn, startPolling, restartPolling, refreshActiveView }
 const authHealthPolling = useAuthHealthPolling();
 
 onMounted(async () => {
-  await authStore.initialize();
+  // Initialize update token in main process
+  await initUpdateToken();
 
-  if (isAuthenticated.value && authStore.canUseApp.value && isConfigured.value) {
-    await validateTokenPermissions();
+  // Validate token permissions
+  await validateTokenPermissions();
 
-    if (missingScopes.value.length === 0) {
-      initializeFollowUpService(provider.pullRequests);
-      loadCurrentView();
-      startPolling();
-    }
+  if (missingScopes.value.length === 0) {
+    initializeFollowUpService(provider.pullRequests);
+    loadCurrentView();
+    startPolling();
   }
 
-  notificationManager.updateConfig({
-    enabled: configStore.notificationsEnabled,
-    notifyOnNewPR: configStore.notifyOnNewPR,
-    notifyOnNewComments: configStore.notifyOnNewComments,
-  });
+  // Start auth health polling
+  authHealthPolling.startPolling();
 });
 
 async function validateTokenPermissions(): Promise<void> {
@@ -234,7 +201,11 @@ async function validateTokenPermissions(): Promise<void> {
   try {
     const token = getApiKey();
     if (!token) {
+      // No token available - redirect back to token view
+      // This should not happen in normal flow but is a safety fallback
+      console.error('[Auth] No token available in App.vue - redirecting to token view');
       tokenValidationComplete.value = true;
+      routerStore.replace('token');
       return;
     }
 
@@ -244,11 +215,34 @@ async function validateTokenPermissions(): Promise<void> {
       configStore.gitlabUrl || undefined
     );
 
+    // Handle completely invalid token (401 error, wrong provider, etc.)
+    if (!result.valid && result.error) {
+      console.error('[Auth] Token validation failed:', result.error);
+
+      // Show notification to user
+      showNotification({
+        title: 'Authentication Error',
+        body: `Your ${configStore.providerType === 'github' ? 'GitHub' : 'GitLab'} token is invalid. Please update it in Settings.`,
+      });
+
+      // Clear the invalid token and redirect to settings
+      await authStore.logout();
+      tokenValidationComplete.value = true;
+      return;
+    }
+
     missingScopes.value = result.missingScopes;
     currentScopes.value = result.scopes;
     tokenValidationComplete.value = true;
   } catch (error) {
     console.error('Token validation error:', error);
+
+    // Show notification for unexpected errors
+    showNotification({
+      title: 'Authentication Error',
+      body: 'Failed to validate your token. Please check your settings.',
+    });
+
     tokenValidationComplete.value = true;
   } finally {
     isValidatingToken.value = false;
@@ -268,28 +262,6 @@ function handleChangeTokenFromScopes(): void {
   tokenValidationComplete.value = false;
   showSettings.value = true;
 }
-
-watch(
-  () => authStore.state.isAuthenticated,
-  (authenticated) => {
-    if (authenticated && authStore.canUseApp.value) {
-      authHealthPolling.startPolling();
-    } else {
-      authHealthPolling.stopPolling();
-    }
-  }
-);
-
-watch(
-  () => ({
-    enabled: configStore.notificationsEnabled,
-    notifyOnNewPR: configStore.notifyOnNewPR,
-    notifyOnNewComments: configStore.notifyOnNewComments,
-  }),
-  (newConfig) => {
-    notificationManager.updateConfig(newConfig);
-  }
-);
 
 watch(
   () => viewStore.activeViewId,
@@ -321,51 +293,18 @@ watch(
   { immediate: true }
 );
 
-async function handleAuthenticated() {
-  await authStore.refreshSubscription();
-
-  // If user already has active subscription and is configured, initialize services
-  // (otherwise they'll go through SubscriptionScreen or WelcomeScreen which handle this)
-  if (authStore.canUseApp.value && isConfigured.value) {
-    await validateTokenPermissions();
-    if (missingScopes.value.length === 0) {
-      initializeFollowUpService(provider.pullRequests);
-      loadCurrentView();
-      startPolling();
-    }
-  }
-}
-
-async function handleSubscribed() {
-  await authStore.refreshSubscription();
-  initializeFollowUpService(provider.pullRequests);
-  loadCurrentView();
-  startPolling();
-}
-
-function handleAuthLogout() {
-  authHealthPolling.stopPolling();
-  clearAllViewStates();
-  notificationManager.reset();
-}
-
-function handleConfigured() {
-  initializeFollowUpService(provider.pullRequests);
-  loadCurrentView();
-  startPolling();
-}
-
 function handleLogout() {
   showSettings.value = false;
   authHealthPolling.stopPolling();
   clearAllViewStates();
-  notificationManager.reset();
+  routerStore.navigate('login');
 }
 
 function handleProviderChanged() {
   showSettings.value = false;
   clearAllViewStates();
-  notificationManager.reset();
+  // Navigate to token view for new provider setup (API key already cleared by SettingsScreen)
+  routerStore.navigate('token');
 }
 
 function handleGlobalError(error: Error, info: string) {
@@ -389,6 +328,13 @@ async function loadCurrentView() {
     return;
   }
 
+  // For pinned view, signal refresh needed by clearing lastFetched
+  // PinnedPRsView watches this and triggers its own data fetch
+  if (isPinnedView(view.id)) {
+    currentViewState.value.lastFetched.value = null;
+    return;
+  }
+
   const state = currentViewState.value;
 
   state.loading.value = true;
@@ -405,9 +351,8 @@ async function loadCurrentView() {
     state.pageInfo.value = result.pageInfo;
     state.lastFetched.value = new Date();
 
-    notificationManager.processUpdate(result.prs).catch(err => {
-      console.error('Notification processing error:', err);
-    });
+    // NOTE: Notifications are handled exclusively by FollowUpService for followed PRs.
+    // View refreshes should NOT trigger notifications.
   } catch (e) {
     state.error.value = e instanceof Error ? e.message : 'Failed to load PRs';
     console.error('Error loading view:', e);
