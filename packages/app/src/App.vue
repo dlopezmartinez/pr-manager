@@ -43,8 +43,7 @@
       </TitleBar>
 
       <StatusBanner
-        @logout="handleLogout"
-        @open-billing="handleOpenBilling"
+        @require-login="handleRequireLogin"
       />
 
       <TrialBanner />
@@ -319,6 +318,11 @@ async function handleOpenBilling() {
   } catch (error) {
     console.error('[App] Failed to open billing portal:', error);
   }
+}
+
+function handleRequireLogin() {
+  // Session/subscription warning - force re-login
+  handleLogout();
 }
 
 function handleProviderChanged() {

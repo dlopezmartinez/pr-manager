@@ -2,7 +2,7 @@ import { reactive, computed, readonly } from 'vue';
 import { authService, type SubscriptionStatus } from '../services/authService';
 import { onAuthError, type AuthErrorEvent } from '../services/http';
 import { AUTH_ERROR_CODES, isUserSuspended } from '../types/errors';
-import { subscriptionSyncStore } from './subscriptionSyncStore';
+import { sessionManager } from '../services/sessionManager';
 import type { AuthUser } from '../preload';
 
 interface AuthState {
@@ -89,11 +89,11 @@ async function initialize(): Promise<void> {
     console.log('[AuthStore] Has token:', hasToken);
 
     if (hasToken) {
-      // Get the actual token to initialize sync store
+      // Get the actual token to initialize session manager
       const token = await authService.getAccessToken();
       if (token) {
-        // Initialize subscription sync from JWT claims
-        subscriptionSyncStore.initFromToken(token);
+        // Initialize session manager with token and expired callback
+        sessionManager.initialize(token, handleSessionExpired);
       }
 
       console.log('[AuthStore] Verifying token with backend...');
@@ -157,10 +157,10 @@ async function login(email: string, password: string): Promise<void> {
     state.isAuthenticated = true;
     state.user = response.user;
 
-    // Initialize subscription sync from the new JWT
+    // Initialize session manager from the new JWT
     const token = await authService.getAccessToken();
     if (token) {
-      subscriptionSyncStore.initFromToken(token);
+      sessionManager.initialize(token, handleSessionExpired);
     }
 
     await refreshSubscription();
@@ -185,13 +185,27 @@ async function logout(): Promise<void> {
     state.suspensionReason = null;
     state.sessionRevoked = false;
 
-    // Reset subscription sync state
-    subscriptionSyncStore.resetSyncState();
+    // Reset session manager
+    sessionManager.reset();
   } catch (error) {
     state.error = error instanceof Error ? error.message : 'Logout failed';
   } finally {
     state.isLoading = false;
   }
+}
+
+function handleSessionExpired(): void {
+  console.warn('[Auth] Session expired via SessionManager, forcing logout');
+
+  state.isAuthenticated = false;
+  state.user = null;
+  state.subscription = null;
+  state.isSuspended = false;
+  state.suspensionReason = null;
+  state.sessionRevoked = false;
+
+  // Trigger logout flow
+  authService.logout().catch(console.error);
 }
 
 async function handleExpiredToken(): Promise<void> {
