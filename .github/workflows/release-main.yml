@@ -532,6 +532,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
+      - name: "Verify upload succeeded"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sleep 5
+          TAG="v${{ needs.minor-release.outputs.version }}"
+
+          ASSETS=$(gh api repos/${{ github.repository }}/releases/tags/$TAG -q '.assets[].name' 2>/dev/null || echo "")
+          DMG_COUNT=$(echo "$ASSETS" | grep -c '\.dmg$' || echo "0")
+          EXE_COUNT=$(echo "$ASSETS" | grep -c '\.exe$' || echo "0")
+          DEB_COUNT=$(echo "$ASSETS" | grep -c '\.deb$' || echo "0")
+
+          echo "Verification: macOS=$DMG_COUNT, Windows=$EXE_COUNT, Linux=$DEB_COUNT"
+
+          if [ "$DMG_COUNT" -eq 0 ] || [ "$EXE_COUNT" -eq 0 ] || [ "$DEB_COUNT" -eq 0 ]; then
+            echo "::warning::Copy verification incomplete - emergency build will handle missing binaries"
+          else
+            echo "✅ All binaries copied successfully"
+          fi
+
   # =============================================================================
   # Build binaries from scratch (fallback when no previous binaries exist)
   # =============================================================================
@@ -669,6 +689,225 @@ jobs:
     name: "Build Linux (Fallback)"
     needs: [detect-changes, minor-release, resolve-binaries]
     if: needs.detect-changes.outputs.app != 'true' && needs.resolve-binaries.outputs.strategy == 'build'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.minor-release.outputs.version }}
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: "Install Linux dependencies"
+        run: sudo apt-get install -y dpkg fakeroot rpm
+
+      - name: "Install dependencies"
+        run: npm ci
+
+      - name: "Build Linux"
+        run: npm run app:make:linux
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: "Upload to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.minor-release.outputs.version }}
+          files: |
+            packages/app/out/make/deb/x64/*.deb
+            packages/app/out/make/rpm/x64/*.rpm
+            packages/app/out/make/zip/linux/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  # =============================================================================
+  # Verify binaries exist in release (safety check)
+  # =============================================================================
+  verify-binaries:
+    name: "Verify Binaries"
+    needs: [minor-release, detect-changes, build-macos, build-windows, build-linux, copy-binaries, build-macos-fallback, build-windows-fallback, build-linux-fallback]
+    if: always() && needs.minor-release.result == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      has_macos: ${{ steps.check.outputs.has_macos }}
+      has_windows: ${{ steps.check.outputs.has_windows }}
+      has_linux: ${{ steps.check.outputs.has_linux }}
+      needs_build: ${{ steps.check.outputs.needs_build }}
+    steps:
+      - name: "Check release has binaries"
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Wait for any in-flight uploads to complete
+          sleep 15
+
+          TAG="v${{ needs.minor-release.outputs.version }}"
+          echo "Checking release $TAG for binaries..."
+
+          # Get asset counts
+          ASSETS=$(gh api repos/${{ github.repository }}/releases/tags/$TAG -q '.assets[].name' 2>/dev/null || echo "")
+
+          DMG_COUNT=$(echo "$ASSETS" | grep -c '\.dmg$' || echo "0")
+          EXE_COUNT=$(echo "$ASSETS" | grep -c '\.exe$' || echo "0")
+          DEB_COUNT=$(echo "$ASSETS" | grep -c '\.deb$' || echo "0")
+
+          echo "macOS (.dmg): $DMG_COUNT"
+          echo "Windows (.exe): $EXE_COUNT"
+          echo "Linux (.deb): $DEB_COUNT"
+
+          # Set individual flags
+          [ "$DMG_COUNT" -gt 0 ] && echo "has_macos=true" >> $GITHUB_OUTPUT || echo "has_macos=false" >> $GITHUB_OUTPUT
+          [ "$EXE_COUNT" -gt 0 ] && echo "has_windows=true" >> $GITHUB_OUTPUT || echo "has_windows=false" >> $GITHUB_OUTPUT
+          [ "$DEB_COUNT" -gt 0 ] && echo "has_linux=true" >> $GITHUB_OUTPUT || echo "has_linux=false" >> $GITHUB_OUTPUT
+
+          # Set overall flag
+          if [ "$DMG_COUNT" -eq 0 ] || [ "$EXE_COUNT" -eq 0 ] || [ "$DEB_COUNT" -eq 0 ]; then
+            echo "⚠️ Missing binaries detected - emergency build required"
+            echo "needs_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "✅ All binaries present in release"
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+          fi
+
+  # =============================================================================
+  # Emergency build jobs (only if verification found missing binaries)
+  # =============================================================================
+  emergency-build-macos:
+    name: "Emergency Build macOS"
+    needs: [minor-release, verify-binaries]
+    if: needs.verify-binaries.outputs.has_macos == 'false'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.minor-release.outputs.version }}
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: "Import Apple Certificate"
+        id: apple-cert
+        continue-on-error: true
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE_BASE64" ]; then
+            echo "⚠️ Apple certificate not configured, skipping signing"
+            echo "identity=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $RUNNER_TEMP/certificate.p12 -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          IDENTITY=$(security find-identity -v -p codesigning $KEYCHAIN_PATH | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/')
+          if [ -n "$IDENTITY" ]; then
+            echo "✅ Apple certificate imported: $IDENTITY"
+            echo "identity=$IDENTITY" >> $GITHUB_OUTPUT
+          else
+            echo "identity=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Install dependencies"
+        run: npm ci
+
+      - name: "Build macOS"
+        run: npm run app:make:mac
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          APPLE_IDENTITY: ${{ steps.apple-cert.outputs.identity }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: "Notarize macOS App"
+        if: steps.apple-cert.outputs.identity != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            echo "⚠️ Apple notarization not configured, skipping"
+            exit 0
+          fi
+          DMG_PATH=$(find packages/app/out/make -name "*.dmg" | head -1)
+          if [ -n "$DMG_PATH" ]; then
+            echo "Notarizing: $DMG_PATH"
+            xcrun notarytool submit "$DMG_PATH" --apple-id "$APPLE_ID" --password "$APPLE_ID_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+            xcrun stapler staple "$DMG_PATH"
+            echo "✅ Notarization complete"
+          fi
+
+      - name: "Upload to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.minor-release.outputs.version }}
+          files: |
+            packages/app/out/make/*.dmg
+            packages/app/out/make/zip/darwin/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  emergency-build-windows:
+    name: "Emergency Build Windows"
+    needs: [minor-release, verify-binaries]
+    if: needs.verify-binaries.outputs.has_windows == 'false'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.minor-release.outputs.version }}
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: "Install dependencies"
+        run: npm ci
+
+      - name: "Build Windows"
+        run: npm run app:make:win
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
+      - name: "Upload to release"
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.minor-release.outputs.version }}
+          files: |
+            packages/app/out/make/squirrel.windows/**/*.exe
+            packages/app/out/make/squirrel.windows/**/*.nupkg
+            packages/app/out/make/squirrel.windows/**/RELEASES
+            packages/app/out/make/zip/win32/**/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  emergency-build-linux:
+    name: "Emergency Build Linux"
+    needs: [minor-release, verify-binaries]
+    if: needs.verify-binaries.outputs.has_linux == 'false'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
