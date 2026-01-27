@@ -337,8 +337,8 @@ function openExternalUrl(url: string) {
 
 .beta-badge {
   position: absolute;
-  top: -4px;
-  right: -28px;
+  bottom: -8px;
+  right: -36px;
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
   font-size: 9px;
