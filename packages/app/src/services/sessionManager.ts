@@ -13,8 +13,7 @@
 import { reactive, computed, readonly } from 'vue';
 import { decodeJWT, isTokenExpired, type SubscriptionClaims, type JWTPayload } from '../utils/jwt';
 import { httpGet } from './http';
-
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.prmanagerhub.com';
+import { API_URL } from '../config/api';
 
 // =============================================================================
 // Constants - All timing in one place

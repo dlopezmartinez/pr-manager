@@ -1,6 +1,7 @@
 import { app, autoUpdater, dialog } from 'electron';
+import { API_URL } from '../config/api';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://api.prmanager.app';
+const BACKEND_URL = API_URL;
 const CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
 let checkIntervalId: NodeJS.Timeout | null = null;
