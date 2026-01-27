@@ -1,70 +1,63 @@
 <template>
-  <!-- Keychain Warning Screen (macOS only, first time) -->
-  <KeychainAuthScreen
-    v-if="currentState === 'warning'"
-    @authorized="handleContinueFromWarning"
-  />
+  <div class="app-wrapper">
+    <Transition :name="transitionName" mode="out-in">
+      <!-- Loading Screen -->
+      <div v-if="currentRoute === 'loading'" key="loading" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Loading...</p>
+      </div>
 
-  <!-- Keychain Verification Screen (shows while verifying access) -->
-  <div v-else-if="currentState === 'verifying'" class="loading-container">
-    <div class="loading-spinner"></div>
-    <p>Verifying Keychain access...</p>
-    <p class="hint">macOS may prompt for your password</p>
-  </div>
+      <!-- Login Screen -->
+      <AuthView
+        v-else-if="currentRoute === 'login'"
+        key="login"
+        @authenticated="handleAuthenticated"
+        @keychain-denied="handleKeychainDenied"
+      />
 
-  <!-- Keychain Error Screen -->
-  <div v-else-if="currentState === 'error'" class="error-container">
-    <div class="error-icon">
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="12" y1="8" x2="12" y2="12"/>
-        <line x1="12" y1="16" x2="12.01" y2="16"/>
-      </svg>
-    </div>
-    <h2>Keychain Access Required</h2>
-    <p class="error-message">{{ errorMessage }}</p>
+      <!-- Keychain Required (access denied) -->
+      <KeychainRequiredView
+        v-else-if="currentRoute === 'keychain-required'"
+        key="keychain-required"
+      />
 
-    <div v-if="wasAccessDenied" class="denied-notice">
-      <p>macOS remembers your choice. To retry, you need to restart the app.</p>
-    </div>
+      <!-- Subscription Screen -->
+      <SubscriptionScreen
+        v-else-if="currentRoute === 'subscription'"
+        key="subscription"
+        @subscribed="handleSubscribed"
+        @logout="handleLogout"
+      />
 
-    <div class="error-actions">
-      <button v-if="wasAccessDenied" class="btn-primary" @click="quitAndRestart">
-        Restart App
-      </button>
-      <button v-else class="btn-primary" @click="retryKeychainAccess">
-        Try Again
-      </button>
-      <button class="btn-danger" @click="useInsecureStorage">
-        Use Insecure Storage
-      </button>
-    </div>
+      <!-- Token View -->
+      <TokenView
+        v-else-if="currentRoute === 'token'"
+        key="token"
+        @configured="handleConfigured"
+      />
 
-    <p class="insecure-warning">
-      <strong>⚠️ Warning:</strong> Insecure storage saves your API token without encryption.
-      Only use this if you understand the security implications.
-    </p>
-
-    <button class="btn-link" @click="resetCredentials">
-      Reset credentials and start fresh
-    </button>
-  </div>
-
-  <!-- Main App -->
-  <component :is="AppComponent" v-else-if="currentState === 'ready'" />
-
-  <!-- Initial Loading Screen -->
-  <div v-else class="loading-container">
-    <div class="loading-spinner"></div>
-    <p>Loading...</p>
+      <!-- Main App -->
+      <component
+        v-else-if="currentRoute === 'app'"
+        key="app"
+        :is="AppComponent"
+      />
+    </Transition>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, onMounted, type Component } from 'vue';
-import KeychainAuthScreen from './components/KeychainAuthScreen.vue';
+import { shallowRef, onMounted, computed, type Component } from 'vue';
+import AuthView from './components/AuthView.vue';
+import KeychainRequiredView from './views/KeychainRequiredView.vue';
+import SubscriptionScreen from './components/SubscriptionScreen.vue';
+import TokenView from './views/TokenView.vue';
+import { authStore } from './stores/authStore';
+import { routerStore, type RouteType } from './stores/routerStore';
+import { initializeConfig, isConfigured as checkIsConfigured, getApiKey } from './stores/configStore';
 
-type AppState = 'loading' | 'warning' | 'verifying' | 'error' | 'ready';
+const HAS_LOGGED_IN_KEY = 'pr-manager-has-logged-in';
+const isMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
 
 // Apply system theme immediately (before App.vue loads with full theme support)
 function applySystemTheme() {
@@ -75,179 +68,163 @@ applySystemTheme();
 
 // Listen for system theme changes
 window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-  // Only update if we're still in pre-app states (App.vue will handle it after)
-  if (currentState.value !== 'ready') {
+  if (routerStore.currentRoute.value !== 'app') {
     document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
   }
 });
 
-const isMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
-const KEYCHAIN_ACCESS_GRANTED_KEY = 'keychain-access-granted';
-
-const currentState = ref<AppState>('loading');
-const errorMessage = ref('');
-const wasAccessDenied = ref(false);
+const currentRoute = computed(() => routerStore.currentRoute.value);
+const transitionName = computed(() => routerStore.transitionName.value);
 const AppComponent = shallowRef<Component | null>(null);
 
-// Verification timeout (30 seconds)
-const VERIFICATION_TIMEOUT = 30000;
-
 onMounted(async () => {
-  await initializeApp();
+  await initialize();
 });
 
-async function initializeApp() {
-  currentState.value = 'loading';
+async function initialize() {
+  routerStore.replace('loading');
 
-  // Non-macOS: skip all Keychain logic, go directly to app
-  if (!isMac) {
+  // Initialize config (loads settings from localStorage - safe, no Keychain)
+  await initializeConfig();
+
+  // Check if user has ever logged in
+  const hasLoggedInBefore = localStorage.getItem(HAS_LOGGED_IN_KEY) === 'true';
+
+  if (!hasLoggedInBefore) {
+    // First time user - go straight to login without touching Keychain
+    routerStore.replace('login');
+    return;
+  }
+
+  // Returning user - initialize auth (will access Keychain)
+  try {
+    await authStore.initialize();
+  } catch (error) {
+    console.error('Auth initialization failed:', error);
+    // If Keychain access was denied, show the required view
+    if (isMac && isKeychainError(error)) {
+      routerStore.replace('keychain-required' as RouteType);
+      return;
+    }
+    // Other errors - go to login
+    routerStore.replace('login');
+    return;
+  }
+
+  // Check 1: Is user logged in?
+  if (!authStore.state.isAuthenticated) {
+    routerStore.replace('login');
+    return;
+  }
+
+  // Check 2: Does user need subscription?
+  if (authStore.needsSubscription.value) {
+    routerStore.replace('subscription');
+    return;
+  }
+
+  // Check 3: Can we skip token view? (has config + token)
+  if (await canSkipTokenView()) {
     await loadApp();
     return;
   }
 
-  // macOS: Check if user has previously granted Keychain access
-  const hasGrantedAccess = localStorage.getItem(KEYCHAIN_ACCESS_GRANTED_KEY) === 'true';
+  // Need to show token view
+  routerStore.replace('token');
+}
 
-  if (hasGrantedAccess) {
-    // User previously granted access - go directly to app
-    // (macOS will prompt for password if needed, but we don't show our warning)
+function isKeychainError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    return msg.includes('keychain') ||
+           msg.includes('denied') ||
+           msg.includes('canceled') ||
+           msg.includes('encryption');
+  }
+  return false;
+}
+
+async function canSkipTokenView(): Promise<boolean> {
+  // Must be configured (has provider settings)
+  if (!checkIsConfigured()) {
+    return false;
+  }
+
+  // Must have a token
+  try {
+    const token = await getApiKey();
+    return !!token;
+  } catch {
+    return false;
+  }
+}
+
+async function handleAuthenticated() {
+  // Mark that user has logged in (for future app starts)
+  localStorage.setItem(HAS_LOGGED_IN_KEY, 'true');
+
+  // Refresh subscription status after login
+  await authStore.refreshSubscription();
+
+  // Check subscription
+  if (authStore.needsSubscription.value) {
+    routerStore.navigate('subscription');
+    return;
+  }
+
+  // Check if can skip token view
+  if (await canSkipTokenView()) {
     await loadApp();
     return;
   }
 
-  // First time or user never granted access - show warning
-  currentState.value = 'warning';
+  routerStore.navigate('token');
 }
 
-async function handleContinueFromWarning() {
-  currentState.value = 'verifying';
-  await verifyKeychainAccess();
+function handleKeychainDenied() {
+  routerStore.replace('keychain-required' as RouteType);
 }
 
-async function verifyKeychainAccess() {
-  try {
-    // Set up a timeout
-    const timeoutPromise = new Promise<{ success: false; error: string }>((resolve) => {
-      setTimeout(() => {
-        resolve({ success: false, error: 'Keychain verification timed out. Please try again.' });
-      }, VERIFICATION_TIMEOUT);
-    });
+async function handleSubscribed() {
+  await authStore.refreshSubscription();
 
-    // Race between verification and timeout
-    const result = await Promise.race([
-      window.electronAPI.keychain.verifyAccess(),
-      timeoutPromise,
-    ]);
-
-    if (result.success) {
-      // Mark that user has granted Keychain access (persistent)
-      localStorage.setItem(KEYCHAIN_ACCESS_GRANTED_KEY, 'true');
-      wasAccessDenied.value = false;
-
-      // If user was using insecure storage, migrate to Keychain
-      await migrateInsecureToKeychain();
-
-      await loadApp();
-    } else {
-      errorMessage.value = result.error || 'Failed to access Keychain. Please try again.';
-      // Check if this was a denial - macOS caches denials per process
-      const errorLower = result.error?.toLowerCase() || '';
-      wasAccessDenied.value = errorLower.includes('denied') ||
-                              errorLower.includes('canceled') ||
-                              errorLower.includes('not available') ||
-                              errorLower.includes('encryption') ||
-                              false;
-      currentState.value = 'error';
-    }
-  } catch (error) {
-    console.error('Keychain verification error:', error);
-    errorMessage.value = error instanceof Error
-      ? error.message
-      : 'An unexpected error occurred while accessing Keychain.';
-    wasAccessDenied.value = false;
-    currentState.value = 'error';
-  }
-}
-
-async function migrateInsecureToKeychain() {
-  try {
-    // Check if user was using insecure storage
-    const isInsecureMode = await window.electronAPI.keychain.getStorageMode();
-
-    if (isInsecureMode) {
-      // Migrate credentials from insecure to Keychain
-      const result = await window.electronAPI.keychain.migrateToSecure();
-
-      if (!result.success) {
-        console.error('Migration failed:', result.error);
-        // Don't block app loading, just log the error
-      } else if (result.migrated > 0) {
-        console.log(`Migrated ${result.migrated} credentials to Keychain`);
-      }
-    }
-  } catch (error) {
-    console.error('Error during migration:', error);
-    // Don't block app loading
-  }
-}
-
-async function retryKeychainAccess() {
-  currentState.value = 'verifying';
-  await verifyKeychainAccess();
-}
-
-async function resetCredentials() {
-  try {
-    // Clear all stored credentials
-    await window.electronAPI.auth.clearToken();
-
-    // Clear the access granted flag
-    localStorage.removeItem(KEYCHAIN_ACCESS_GRANTED_KEY);
-
-    // Reload the app to start fresh
-    window.location.reload();
-  } catch (error) {
-    console.error('Error resetting credentials:', error);
-    errorMessage.value = 'Failed to reset credentials. Please restart the app.';
-  }
-}
-
-function quitAndRestart() {
-  // Use IPC to relaunch the app
-  window.electronAPI.ipc.send('relaunch-app');
-}
-
-async function useInsecureStorage() {
-  try {
-    // Set insecure storage mode
-    await window.electronAPI.keychain.setStorageMode(true);
-
-    // Do NOT set the access granted flag - user chose insecure
-    // This means they'll see the warning again next time (encouraging Keychain use)
-
-    // Load the app
+  // Check if can skip token view
+  if (await canSkipTokenView()) {
     await loadApp();
-  } catch (error) {
-    console.error('Error enabling insecure storage:', error);
-    errorMessage.value = 'Failed to enable insecure storage. Please try again.';
+    return;
   }
+
+  routerStore.navigate('token');
+}
+
+function handleLogout() {
+  routerStore.navigate('login');
+}
+
+async function handleConfigured() {
+  await loadApp();
 }
 
 async function loadApp() {
   try {
-    // Dynamically import App.vue - this defers loading all its dependencies (stores, etc.)
+    // Dynamically import App.vue to defer loading all its dependencies
     const module = await import('./App.vue');
     AppComponent.value = module.default;
-    currentState.value = 'ready';
+    routerStore.navigate('app');
   } catch (error) {
     console.error('Error loading app:', error);
-    errorMessage.value = 'Failed to load the application. Please restart.';
-    currentState.value = 'error';
+    // On error, go back to token view
+    routerStore.replace('token');
   }
 }
 </script>
 
 <style>
+.app-wrapper {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .loading-container {
   display: flex;
   flex-direction: column;
@@ -282,174 +259,51 @@ async function loadApp() {
   font-size: 14px;
 }
 
-.loading-container .hint {
-  font-size: 12px;
-  color: var(--color-text-tertiary, #9ca3af);
-}
-
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-/* Error Screen Styles */
-.error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  padding: 24px;
-  text-align: center;
-  background-color: var(--color-bg-primary, #ffffff);
+/* Fade transition (for loading state) */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
 }
 
-:root[data-theme="dark"] .error-container {
-  background-color: var(--color-bg-primary, #1a1a1a);
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
-.error-icon {
-  color: #f59e0b;
-  margin-bottom: 16px;
+/* Slide Left transition (forward navigation) */
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease;
 }
 
-.error-container h2 {
-  margin: 0 0 12px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-text-primary, #1f2937);
+.slide-left-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
 }
 
-:root[data-theme="dark"] .error-container h2 {
-  color: #f9fafb;
+.slide-left-leave-to {
+  transform: translateX(-30%);
+  opacity: 0;
 }
 
-.error-message {
-  margin: 0 0 24px 0;
-  font-size: 14px;
-  color: var(--color-text-secondary, #6b7280);
-  max-width: 400px;
-  line-height: 1.5;
+/* Slide Right transition (backward navigation) */
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease;
 }
 
-.error-actions {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
+.slide-right-enter-from {
+  transform: translateX(-30%);
+  opacity: 0;
 }
 
-.btn-primary,
-.btn-secondary {
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-}
-
-.btn-primary {
-  background-color: #6366f1;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #4f46e5;
-}
-
-.btn-secondary {
-  background-color: transparent;
-  color: var(--color-text-secondary, #6b7280);
-  border: 1px solid var(--color-border, #e5e7eb);
-}
-
-:root[data-theme="dark"] .btn-secondary {
-  border-color: #374151;
-  color: #9ca3af;
-}
-
-.btn-secondary:hover {
-  background-color: var(--color-surface-hover, #f3f4f6);
-}
-
-:root[data-theme="dark"] .btn-secondary:hover {
-  background-color: #374151;
-}
-
-.btn-danger {
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  background-color: #dc2626;
-  color: white;
-}
-
-.btn-danger:hover {
-  background-color: #b91c1c;
-}
-
-.btn-link {
-  background: none;
-  border: none;
-  color: var(--color-text-tertiary, #9ca3af);
-  font-size: 12px;
-  cursor: pointer;
-  text-decoration: underline;
-  padding: 8px;
-  margin-top: 8px;
-}
-
-.btn-link:hover {
-  color: var(--color-text-secondary, #6b7280);
-}
-
-:root[data-theme="dark"] .btn-link:hover {
-  color: #d1d5db;
-}
-
-.insecure-warning {
-  margin: 0 0 16px 0;
-  font-size: 12px;
-  color: var(--color-text-tertiary, #9ca3af);
-  max-width: 380px;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.insecure-warning strong {
-  color: #f59e0b;
-}
-
-.error-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--color-text-tertiary, #9ca3af);
-  max-width: 350px;
-  line-height: 1.5;
-}
-
-.denied-notice {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  max-width: 350px;
-}
-
-.denied-notice p {
-  margin: 0;
-  font-size: 13px;
-  color: #d97706;
-  line-height: 1.4;
-}
-
-:root[data-theme="dark"] .denied-notice {
-  background: rgba(245, 158, 11, 0.15);
+.slide-right-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
 }
 </style>

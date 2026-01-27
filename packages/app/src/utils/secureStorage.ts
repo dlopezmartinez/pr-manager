@@ -19,54 +19,14 @@ interface SecureData {
 }
 
 const SECURE_FILE_NAME = 'secure-storage.json';
-const INSECURE_FILE_NAME = 'insecure-storage.json';
-const STORAGE_MODE_FILE = 'storage-mode.json';
 
-// Flag to track if we're using insecure storage
-let _useInsecureStorage: boolean | null = null;
-
-/**
- * Get the current storage mode (secure or insecure)
- */
-export function getStorageMode(): boolean {
-  if (_useInsecureStorage === null) {
-    try {
-      const modePath = path.join(app.getPath('userData'), STORAGE_MODE_FILE);
-      if (fs.existsSync(modePath)) {
-        const content = fs.readFileSync(modePath, 'utf-8');
-        const data = JSON.parse(content);
-        _useInsecureStorage = data.useInsecureStorage === true;
-      } else {
-        _useInsecureStorage = false;
-      }
-    } catch {
-      _useInsecureStorage = false;
-    }
-  }
-  return _useInsecureStorage;
+function getStoragePath(): string {
+  return path.join(app.getPath('userData'), SECURE_FILE_NAME);
 }
 
-/**
- * Set the storage mode (secure or insecure)
- */
-export function setStorageMode(useInsecure: boolean): void {
+function loadSecureData(): SecureData {
   try {
-    const modePath = path.join(app.getPath('userData'), STORAGE_MODE_FILE);
-    fs.writeFileSync(modePath, JSON.stringify({ useInsecureStorage: useInsecure }), 'utf-8');
-    _useInsecureStorage = useInsecure;
-  } catch (error) {
-    console.error('Error setting storage mode:', error);
-  }
-}
-
-function getStoragePath(insecure = false): string {
-  const fileName = insecure ? INSECURE_FILE_NAME : SECURE_FILE_NAME;
-  return path.join(app.getPath('userData'), fileName);
-}
-
-function loadSecureData(insecure = false): SecureData {
-  try {
-    const filePath = getStoragePath(insecure);
+    const filePath = getStoragePath();
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, 'utf-8');
       return JSON.parse(content);
@@ -77,9 +37,9 @@ function loadSecureData(insecure = false): SecureData {
   return {};
 }
 
-function saveSecureData(data: SecureData, insecure = false): void {
+function saveSecureData(data: SecureData): void {
   try {
-    const filePath = getStoragePath(insecure);
+    const filePath = getStoragePath();
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
   } catch (error) {
     console.error('Error saving secure storage:', error);
@@ -91,22 +51,6 @@ export function isEncryptionAvailable(): boolean {
 }
 
 export function setSecureValue(key: string, value: string): boolean {
-  const useInsecure = getStorageMode();
-
-  if (useInsecure) {
-    // Insecure mode: store plain text (base64 encoded for consistency)
-    try {
-      const data = loadSecureData(true);
-      data[key] = Buffer.from(value).toString('base64');
-      saveSecureData(data, true);
-      return true;
-    } catch (error) {
-      console.error('Error storing value (insecure mode):', error);
-      return false;
-    }
-  }
-
-  // Secure mode: use Keychain encryption
   if (!getSafeStorage().isEncryptionAvailable()) {
     console.error('Encryption not available - cannot store sensitive data securely');
     return false;
@@ -125,24 +69,6 @@ export function setSecureValue(key: string, value: string): boolean {
 }
 
 export function getSecureValue(key: string): string | null {
-  const useInsecure = getStorageMode();
-
-  if (useInsecure) {
-    // Insecure mode: read plain text (base64 encoded)
-    const data = loadSecureData(true);
-    const base64Value = data[key];
-    if (!base64Value) {
-      return null;
-    }
-    try {
-      return Buffer.from(base64Value, 'base64').toString('utf-8');
-    } catch (error) {
-      console.error('Error reading value (insecure mode):', error);
-      return null;
-    }
-  }
-
-  // Secure mode: use Keychain decryption
   const data = loadSecureData();
   const encryptedBase64 = data[key];
 
@@ -165,13 +91,11 @@ export function getSecureValue(key: string): string | null {
 }
 
 export function deleteSecureValue(key: string): boolean {
-  const useInsecure = getStorageMode();
-
   try {
-    const data = loadSecureData(useInsecure);
+    const data = loadSecureData();
     if (key in data) {
       delete data[key];
-      saveSecureData(data, useInsecure);
+      saveSecureData(data);
       return true;
     }
     return false;
@@ -195,14 +119,12 @@ export function clearSecureStorage(): boolean {
 }
 
 /**
- * Check if any storage file exists and has stored credentials.
+ * Check if storage file exists and has stored credentials.
  * This does NOT trigger Keychain access - it only checks file existence.
- * Checks both secure and insecure storage files.
  */
 export function hasStoredCredentials(): boolean {
   try {
-    // Check secure storage
-    const securePath = getStoragePath(false);
+    const securePath = getStoragePath();
     if (fs.existsSync(securePath)) {
       const content = fs.readFileSync(securePath, 'utf-8');
       const data = JSON.parse(content);
@@ -210,17 +132,6 @@ export function hasStoredCredentials(): boolean {
         return true;
       }
     }
-
-    // Check insecure storage
-    const insecurePath = getStoragePath(true);
-    if (fs.existsSync(insecurePath)) {
-      const content = fs.readFileSync(insecurePath, 'utf-8');
-      const data = JSON.parse(content);
-      if (Object.keys(data).length > 0) {
-        return true;
-      }
-    }
-
     return false;
   } catch {
     return false;
@@ -228,7 +139,7 @@ export function hasStoredCredentials(): boolean {
 }
 
 /**
- * Verify that Keychain access is working by attempting to decrypt stored data.
+ * Verify that Keychain access is working by attempting to encrypt/decrypt.
  * This WILL trigger the Keychain prompt if access hasn't been granted.
  * Returns success/failure and any error message.
  */
@@ -242,9 +153,8 @@ export function verifyKeychainAccess(): { success: boolean; error?: string } {
     // Load the secure data (this doesn't trigger Keychain)
     const data = loadSecureData();
 
-    // If there's no data, we can't verify but that's okay
+    // If there's no data, try to encrypt/decrypt a test value to verify Keychain works
     if (Object.keys(data).length === 0) {
-      // Try to encrypt/decrypt a test value to verify Keychain works
       const testValue = 'keychain-test';
       const encrypted = getSafeStorage().encryptString(testValue);
       const decrypted = getSafeStorage().decryptString(encrypted);
