@@ -140,14 +140,16 @@ export async function getSubscriptionClaims(userId: string): Promise<Subscriptio
   const isActive = ['active', 'trialing'].includes(subscription.status) &&
     (!subscription.currentPeriodEnd || subscription.currentPeriodEnd > new Date());
 
-  // Determine plan type from priceId
+  // Determine plan type from lemonSqueezyVariantId
   let plan: SubscriptionClaims['plan'] = null;
-  if (subscription.priceId) {
-    if (subscription.priceId.includes('yearly') || subscription.priceId.includes('annual')) {
-      plan = 'yearly';
-    } else if (subscription.priceId.includes('monthly')) {
-      plan = 'monthly';
-    }
+  const variantId = subscription.lemonSqueezyVariantId;
+  const monthlyVariantId = process.env.LEMONSQUEEZY_VARIANT_MONTHLY;
+  const yearlyVariantId = process.env.LEMONSQUEEZY_VARIANT_YEARLY;
+
+  if (variantId && yearlyVariantId && variantId === yearlyVariantId) {
+    plan = 'yearly';
+  } else if (variantId && monthlyVariantId && variantId === monthlyVariantId) {
+    plan = 'monthly';
   }
 
   return {
