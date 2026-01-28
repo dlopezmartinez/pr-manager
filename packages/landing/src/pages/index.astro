@@ -6,6 +6,9 @@ import Hero from '../components/Hero.astro';
 import Features from '../components/Features.astro';
 import Pricing from '../components/Pricing.astro';
 import Footer from '../components/Footer.astro';
+
+// Server-render to read BETA_MODE env var at runtime
+export const prerender = false;
 ---
 
 <Layout title="PR Manager - Your Pull Requests, One Click Away | Desktop App for GitHub & GitLab">
