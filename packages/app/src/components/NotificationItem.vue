@@ -51,7 +51,18 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { GitCommit, MessageSquare, UserCheck, AlertCircle, GitMerge, XCircle, X, CheckCircle2 } from 'lucide-vue-next';
+import {
+  GitCommit,
+  MessageSquare,
+  UserCheck,
+  AlertCircle,
+  GitMerge,
+  XCircle,
+  X,
+  CheckCircle2,
+  RefreshCw,
+  Rocket,
+} from 'lucide-vue-next';
 import type { InboxNotification, NotificationChangeType } from '../stores/notificationInboxStore';
 import { getNotificationTypeText } from '../stores/notificationInboxStore';
 
@@ -78,14 +89,20 @@ const typeIcon = computed(() => {
       return MessageSquare;
     case 'new_reviews':
       return UserCheck;
+    case 'review_approved':
+      return CheckCircle2;
+    case 'review_changes_requested':
+      return AlertCircle;
     case 'status_change':
       return AlertCircle;
+    case 'merge_status_change':
+      return RefreshCw;
     case 'pr_merged':
       return GitMerge;
     case 'pr_closed':
       return XCircle;
     case 'ready_to_merge':
-      return CheckCircle2;
+      return Rocket;
     default:
       return AlertCircle;
   }
@@ -183,8 +200,8 @@ const timeAgo = computed(() => {
 }
 
 .type-badge.new_commits {
-  background: var(--color-accent-light);
-  color: var(--color-accent-primary);
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
 }
 
 .type-badge.new_comments {
@@ -193,14 +210,32 @@ const timeAgo = computed(() => {
 }
 
 .type-badge.new_reviews {
+  background: rgba(168, 85, 247, 0.15);
+  color: #a855f7;
+}
+
+/* Review approved - green */
+.type-badge.review_approved {
   background: var(--color-success-bg);
   color: var(--color-success);
+}
+
+/* Review changes requested - orange */
+.type-badge.review_changes_requested {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
 }
 
 .type-badge.status_change,
 .type-badge.pr_closed {
   background: var(--color-warning-bg);
   color: var(--color-warning);
+}
+
+/* Merge status change - yellow */
+.type-badge.merge_status_change {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
 }
 
 .type-badge.pr_merged {

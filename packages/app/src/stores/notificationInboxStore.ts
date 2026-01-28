@@ -3,8 +3,11 @@ import { reactive, watch, computed } from 'vue';
 export type NotificationChangeType =
   | 'new_commits'
   | 'new_comments'
-  | 'new_reviews'
+  | 'new_reviews'           // Kept for backwards compatibility
+  | 'review_approved'       // New: Review with approval
+  | 'review_changes_requested'  // New: Review requesting changes
   | 'status_change'
+  | 'merge_status_change'   // New: Change in merge status
   | 'pr_closed'
   | 'pr_merged'
   | 'ready_to_merge';
@@ -149,6 +152,16 @@ export function addNotification(
   return newNotification;
 }
 
+export interface BatchNotificationChanges {
+  newCommits?: number;
+  newComments?: number;
+  newReviews?: number;           // Kept for backwards compatibility
+  reviewApproved?: number;       // New
+  reviewChangesRequested?: number;  // New
+  mergeStatusChange?: string;    // New: New merge status value
+  prMerged?: boolean;            // New
+}
+
 export function addBatchNotifications(
   prInfo: {
     prId: string;
@@ -159,11 +172,7 @@ export function addBatchNotifications(
     authorLogin: string;
     authorAvatarUrl: string;
   },
-  changes: {
-    newCommits?: number;
-    newComments?: number;
-    newReviews?: number;
-  }
+  changes: BatchNotificationChanges
 ): InboxNotification[] {
   const added: InboxNotification[] = [];
 
@@ -183,11 +192,48 @@ export function addBatchNotifications(
     }));
   }
 
+  // Legacy support for newReviews
   if (changes.newReviews && changes.newReviews > 0) {
     added.push(addNotification({
       ...prInfo,
       type: 'new_reviews',
       changeDetails: { count: changes.newReviews },
+    }));
+  }
+
+  // New: Review approved
+  if (changes.reviewApproved && changes.reviewApproved > 0) {
+    added.push(addNotification({
+      ...prInfo,
+      type: 'review_approved',
+      changeDetails: { count: changes.reviewApproved },
+    }));
+  }
+
+  // New: Changes requested
+  if (changes.reviewChangesRequested && changes.reviewChangesRequested > 0) {
+    added.push(addNotification({
+      ...prInfo,
+      type: 'review_changes_requested',
+      changeDetails: { count: changes.reviewChangesRequested },
+    }));
+  }
+
+  // New: Merge status change
+  if (changes.mergeStatusChange) {
+    added.push(addNotification({
+      ...prInfo,
+      type: 'merge_status_change',
+      changeDetails: {},
+    }));
+  }
+
+  // New: PR merged
+  if (changes.prMerged) {
+    added.push(addNotification({
+      ...prInfo,
+      type: 'pr_merged',
+      changeDetails: {},
     }));
   }
 
@@ -276,8 +322,14 @@ export function getNotificationTypeText(type: NotificationChangeType, count?: nu
       return count === 1 ? '1 new comment' : `${count} new comments`;
     case 'new_reviews':
       return count === 1 ? '1 new review' : `${count} new reviews`;
+    case 'review_approved':
+      return count === 1 ? 'Approved' : `${count} approvals`;
+    case 'review_changes_requested':
+      return count === 1 ? 'Changes requested' : `${count} change requests`;
     case 'status_change':
       return 'Status changed';
+    case 'merge_status_change':
+      return 'Merge status changed';
     case 'pr_closed':
       return 'PR closed';
     case 'pr_merged':
