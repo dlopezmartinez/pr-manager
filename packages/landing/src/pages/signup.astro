@@ -2,6 +2,9 @@
 import Layout from '../layouts/Layout.astro';
 import Header from '../components/Header.astro';
 
+// Server-render to read BETA_MODE env var at runtime
+export const prerender = false;
+
 const isBetaMode = import.meta.env.BETA_MODE === 'true';
 ---
 
