@@ -122,14 +122,16 @@ export class GitHubActionsManager implements IActionsManager {
     const canMerge = pr.mergeStateStatus === 'CLEAN' ||
       (pr.viewerCanMergeAsAdmin && pr.mergeable === 'MERGEABLE');
 
-    // Determine allowed merge method (prefer MERGE > SQUASH > REBASE)
-    let allowedMergeMethod: 'MERGE' | 'SQUASH' | 'REBASE' = 'MERGE';
+    // Collect all allowed merge methods
+    const allowedMergeMethods: ('MERGE' | 'SQUASH' | 'REBASE')[] = [];
     if (repo_data.mergeCommitAllowed) {
-      allowedMergeMethod = 'MERGE';
-    } else if (repo_data.squashMergeAllowed) {
-      allowedMergeMethod = 'SQUASH';
-    } else if (repo_data.rebaseMergeAllowed) {
-      allowedMergeMethod = 'REBASE';
+      allowedMergeMethods.push('MERGE');
+    }
+    if (repo_data.squashMergeAllowed) {
+      allowedMergeMethods.push('SQUASH');
+    }
+    if (repo_data.rebaseMergeAllowed) {
+      allowedMergeMethods.push('REBASE');
     }
 
     return {
@@ -137,7 +139,7 @@ export class GitHubActionsManager implements IActionsManager {
       mergeable: pr.mergeStateStatus, // Return mergeStateStatus as the main status
       mergeStateStatus: pr.mergeStateStatus,
       canMerge,
-      allowedMergeMethod,
+      allowedMergeMethods,
     };
   }
 
