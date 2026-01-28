@@ -21,22 +21,22 @@
         </div>
 
         <h2 class="modal-title">
-          {{ isSessionReplaced ? 'Sesión Cerrada' : 'Sincronización Requerida' }}
+          {{ isSessionReplaced ? 'Session Closed' : 'Sync Required' }}
         </h2>
 
         <p class="modal-message">
           <template v-if="isSessionReplaced">
-            Tu sesión fue cerrada porque iniciaste sesión desde otro dispositivo.
-            Solo se permite una sesión activa por cuenta.
+            Your session was closed because you signed in from another device.
+            Only one active session per account is allowed.
           </template>
           <template v-else>
-            Se requiere sincronizar con los servicios de PR Manager para
-            continuar usando la aplicación. Esto ocurre después de 12 horas de uso.
+            Sync with PR Manager services is required to continue using the app.
+            This happens after 12 hours of usage.
           </template>
         </p>
 
         <p class="modal-hint">
-          Por favor, cierra sesión y vuelve a iniciar para continuar.
+          Please sign out and sign in again to continue.
         </p>
 
         <button
@@ -46,10 +46,10 @@
         >
           <template v-if="isLoggingOut">
             <span class="spinner"></span>
-            Cerrando sesión...
+            Signing out...
           </template>
           <template v-else>
-            Cerrar Sesión
+            Sign Out
           </template>
         </button>
       </div>
