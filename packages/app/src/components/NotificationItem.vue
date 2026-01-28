@@ -10,6 +10,7 @@
     <div v-if="!notification.read" class="unread-dot" />
 
     <div class="notification-content">
+      <!-- Row 1: Badge + Timestamp -->
       <div class="notification-header">
         <div class="type-badge" :class="notification.type">
           <component :is="typeIcon" :size="12" :stroke-width="2" />
@@ -18,36 +19,39 @@
         <span class="notification-time">{{ timeAgo }}</span>
       </div>
 
-      <div class="pr-info">
-        <span class="pr-title">{{ notification.prTitle }}</span>
-        <span class="pr-meta">
-          {{ notification.repoNameWithOwner }} #{{ notification.prNumber }}
-        </span>
-      </div>
-    </div>
+      <!-- Row 2: PR Info + Actions -->
+      <div class="notification-body">
+        <div class="pr-info">
+          <span class="pr-title">{{ notification.prTitle }}</span>
+          <span class="pr-meta">
+            {{ notification.repoNameWithOwner }} #{{ notification.prNumber }}
+          </span>
+        </div>
 
-    <div class="notification-actions" @click.stop>
-      <button
-        v-if="notification.type === 'ready_to_merge' && canMerge"
-        class="action-btn merge-btn"
-        :class="{ merging: isMerging }"
-        :disabled="isMerging"
-        @click="$emit('merge')"
-        title="Merge PR"
-      >
-        <span v-if="isMerging" class="merge-spinner" />
-        <template v-else>
-          <GitMerge :size="14" :stroke-width="2" />
-          <span class="merge-text">Merge</span>
-        </template>
-      </button>
-      <button
-        class="action-btn dismiss-btn"
-        @click="$emit('dismiss')"
-        title="Dismiss"
-      >
-        <X :size="14" :stroke-width="2" />
-      </button>
+        <div class="notification-actions" @click.stop>
+          <button
+            v-if="notification.type === 'ready_to_merge' && canMerge"
+            class="action-btn merge-btn"
+            :class="{ merging: isMerging }"
+            :disabled="isMerging"
+            @click="$emit('merge')"
+            title="Merge PR"
+          >
+            <span v-if="isMerging" class="merge-spinner" />
+            <template v-else>
+              <GitMerge :size="14" :stroke-width="2" />
+              <span class="merge-text">Merge</span>
+            </template>
+          </button>
+          <button
+            class="action-btn dismiss-btn"
+            @click="$emit('dismiss')"
+            title="Dismiss"
+          >
+            <X :size="14" :stroke-width="2" />
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -138,7 +142,7 @@ const timeAgo = computed(() => {
 <style scoped>
 .notification-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--spacing-sm);
   padding: var(--spacing-md);
   background: var(--color-bg-elevated);
@@ -189,7 +193,8 @@ const timeAgo = computed(() => {
 .notification-header {
   display: flex;
   align-items: center;
-  margin-bottom: var(--spacing-xs);
+  justify-content: space-between;
+  margin-bottom: var(--spacing-sm);
 }
 
 .type-badge {
@@ -252,17 +257,24 @@ const timeAgo = computed(() => {
 }
 
 .notification-time {
-  position: absolute;
-  top: var(--spacing-sm);
-  right: var(--spacing-sm);
   font-size: 11px;
   color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.notification-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
 }
 
 .pr-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .pr-title {
@@ -282,12 +294,7 @@ const timeAgo = computed(() => {
 .notification-actions {
   display: flex;
   gap: var(--spacing-xs);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-}
-
-.notification-item:hover .notification-actions {
-  opacity: 1;
+  flex-shrink: 0;
 }
 
 .action-btn {
