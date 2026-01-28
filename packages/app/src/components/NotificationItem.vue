@@ -189,7 +189,6 @@ const timeAgo = computed(() => {
 .notification-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin-bottom: var(--spacing-xs);
 }
 
@@ -253,6 +252,9 @@ const timeAgo = computed(() => {
 }
 
 .notification-time {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
   font-size: 11px;
   color: var(--color-text-tertiary);
 }
