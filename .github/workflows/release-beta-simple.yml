@@ -202,11 +202,15 @@ jobs:
           echo "Release assets:"
           ls -la release-assets/
 
-      - name: "Commit and tag"
+      - name: "Commit version bump and tag"
         env:
           NEW_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          git add -A
+          # Only commit package.json files, NOT the binary artifacts
+          git add package.json package-lock.json \
+            packages/app/package.json \
+            packages/backend/package.json \
+            packages/landing/package.json
           git commit -m "chore(release): v$NEW_VERSION"
           git tag -a "v$NEW_VERSION" -m "Beta Release v$NEW_VERSION"
           git push origin develop
