@@ -18,17 +18,26 @@ permissions:
   actions: write
 
 jobs:
-  prepare:
-    name: "Prepare"
+  # ===========================================================================
+  # Phase 1: Calculate version and update package.json files
+  # ===========================================================================
+  prepare-and-version:
+    name: "Prepare & Update Version"
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.new_version }}
+      commit_sha: ${{ steps.push.outputs.commit_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: develop
           fetch-depth: 10
           token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "Setup Git"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: "Calculate beta version"
         id: version
@@ -65,157 +74,53 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Version: $CURRENT -> $NEW_VERSION"
 
-  build-macos:
-    name: "Build macOS"
-    needs: prepare
-    runs-on: macos-latest
-    env:
-      NEW_VERSION: ${{ needs.prepare.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: develop
-
-      - name: "Setup Node.js"
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: "Setup macOS signing"
-        id: signing
-        if: inputs.skip_signing != true
-        uses: ./.github/actions/setup-macos-signing
-        with:
-          certificate-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
-          certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-      - name: "Install dependencies"
-        run: npm ci
-
-      - name: "Update version before build"
+      - name: "Update version in all packages"
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
-          echo "Setting version to $NEW_VERSION"
           npm version $NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
 
-      - name: "Build and Sign"
+      - name: "Commit and push version update"
+        id: push
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          # macOS signing variables (used by forge.config.ts)
-          APPLE_IDENTITY: ${{ steps.signing.outputs.identity }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
-          if [ -n "$APPLE_IDENTITY" ]; then
-            echo "Building with code signing identity: $APPLE_IDENTITY"
-          else
-            echo "Building without code signing (development mode)"
-          fi
-          cd packages/app
-          npm run make -- --platform darwin --arch arm64
+          git add package.json package-lock.json \
+            packages/app/package.json \
+            packages/backend/package.json \
+            packages/landing/package.json
+          git commit -m "chore(release): v$NEW_VERSION"
+          git push origin develop
 
-      - name: "Upload artifacts"
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-artifacts
-          path: |
-            packages/app/out/make/*.dmg
-            packages/app/out/make/zip/darwin/**/*.zip
-          retention-days: 1
+          COMMIT_SHA=$(git rev-parse HEAD)
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "Pushed version update: $COMMIT_SHA"
 
-  build-windows:
-    name: "Build Windows"
-    needs: prepare
-    runs-on: windows-latest
-    env:
-      NEW_VERSION: ${{ needs.prepare.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: develop
+  # ===========================================================================
+  # Phase 2: Build all platforms using the reusable workflow
+  # ===========================================================================
+  build:
+    name: "Build"
+    needs: prepare-and-version
+    uses: ./.github/workflows/build-artifacts.yml
+    with:
+      ref: ${{ needs.prepare-and-version.outputs.commit_sha }}
+      artifact-suffix: "-release"
+      sign-macos: ${{ inputs.skip_signing != true }}
+      sign-windows: ${{ inputs.skip_signing != true }}
+    secrets: inherit
 
-      - name: "Setup Node.js"
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: "Install dependencies"
-        run: npm ci
-
-      - name: "Update version before build"
-        run: |
-          echo "Setting version to $env:NEW_VERSION"
-          npm version $env:NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
-
-      - name: "Build"
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: |
-          cd packages/app
-          npm run make -- --platform win32 --arch x64
-
-      - name: "Upload artifacts"
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-artifacts
-          path: |
-            packages/app/out/make/squirrel.windows/**/*.exe
-            packages/app/out/make/squirrel.windows/**/*.nupkg
-            packages/app/out/make/squirrel.windows/**/RELEASES
-          retention-days: 1
-
-  build-linux:
-    name: "Build Linux"
-    needs: prepare
-    runs-on: ubuntu-latest
-    env:
-      NEW_VERSION: ${{ needs.prepare.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: develop
-
-      - name: "Setup Node.js"
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: "Install dependencies"
-        run: npm ci
-
-      - name: "Update version before build"
-        run: |
-          echo "Setting version to $NEW_VERSION"
-          npm version $NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
-
-      - name: "Build"
-        env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: |
-          cd packages/app
-          npm run make -- --platform linux --arch x64
-
-      - name: "Upload artifacts"
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifacts
-          path: |
-            packages/app/out/make/deb/x64/*.deb
-            packages/app/out/make/rpm/x64/*.rpm
-          retention-days: 1
-
+  # ===========================================================================
+  # Phase 3: Create GitHub Release
+  # ===========================================================================
   release:
     name: "Create Release"
-    needs: [prepare, build-macos, build-windows, build-linux]
+    needs: [prepare-and-version, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: develop
-          fetch-depth: 0
+          ref: ${{ needs.prepare-and-version.outputs.commit_sha }}
           token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: "Setup Git"
@@ -223,57 +128,93 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: "Update version"
+      - name: "Create and push tag"
         env:
-          NEW_VERSION: ${{ needs.prepare.outputs.version }}
+          NEW_VERSION: ${{ needs.prepare-and-version.outputs.version }}
         run: |
-          npm version $NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
+          git tag -a "v$NEW_VERSION" -m "Beta Release v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
 
       - name: "Download all artifacts"
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: "Organize assets"
+      - name: "Organize release assets"
         run: |
           mkdir -p release-assets
-          find artifacts -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.exe" -o -name "*.deb" -o -name "*.rpm" -o -name "*.nupkg" -o -name "RELEASES" \) -exec cp {} release-assets/ \;
+
+          # Find all release files
+          find artifacts -type f \( \
+            -name "*.dmg" -o \
+            -name "*.zip" -o \
+            -name "*.exe" -o \
+            -name "*.deb" -o \
+            -name "*.rpm" -o \
+            -name "*.nupkg" -o \
+            -name "RELEASES" \
+          \) -exec cp {} release-assets/ \;
+
           echo "Release assets:"
           ls -la release-assets/
 
-      - name: "Commit version bump and tag"
-        env:
-          NEW_VERSION: ${{ needs.prepare.outputs.version }}
+      - name: "Generate changelog"
+        id: changelog
         run: |
-          # Only commit package.json files, NOT the binary artifacts
-          git add package.json package-lock.json \
-            packages/app/package.json \
-            packages/backend/package.json \
-            packages/landing/package.json
-          git commit -m "chore(release): v$NEW_VERSION"
-          git tag -a "v$NEW_VERSION" -m "Beta Release v$NEW_VERSION"
-          git push origin develop
-          git push origin "v$NEW_VERSION"
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | grep -v "^- chore(release)" | head -20)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges -10 | grep -v "^- chore(release)")
+          fi
 
-      - name: "Create Release"
+          {
+            echo "changelog<<EOF"
+            echo "### Changes"
+            if [ -n "$COMMITS" ]; then
+              echo "$COMMITS"
+            else
+              echo "- Beta release"
+            fi
+            echo ""
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: "Create GitHub Release"
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ needs.prepare.outputs.version }}
-          name: "v${{ needs.prepare.outputs.version }} (Beta)"
+          tag_name: v${{ needs.prepare-and-version.outputs.version }}
+          name: "v${{ needs.prepare-and-version.outputs.version }} (Beta)"
           body: |
-            ## Beta Release v${{ needs.prepare.outputs.version }}
+            ## Beta Release v${{ needs.prepare-and-version.outputs.version }}
 
             This is a **pre-release** version for testing.
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
 
             ### Downloads
 
             | Platform | File |
             |----------|------|
-            | macOS | `PR-Manager-${{ needs.prepare.outputs.version }}.dmg` |
-            | Windows | `PRManager-${{ needs.prepare.outputs.version }}-Setup.exe` |
-            | Linux | `pr-manager_${{ needs.prepare.outputs.version }}_amd64.deb` / `.rpm` |
+            | macOS | `PR-Manager-${{ needs.prepare-and-version.outputs.version }}.dmg` |
+            | Windows | `PRManager-${{ needs.prepare-and-version.outputs.version }}-Setup.exe` |
+            | Linux | `pr-manager_${{ needs.prepare-and-version.outputs.version }}_amd64.deb` / `.rpm` |
+
+            ---
+
+            *To promote this beta to stable, run the "Release Stable" workflow with this tag.*
           draft: false
           prerelease: true
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "Summary"
+        run: |
+          echo "## Beta Release Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** v${{ needs.prepare-and-version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To promote this to stable, run the **Release Stable** workflow." >> $GITHUB_STEP_SUMMARY
