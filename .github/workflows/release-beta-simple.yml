@@ -82,6 +82,14 @@ jobs:
           node-version: "20"
           cache: "npm"
 
+      - name: "Setup macOS signing"
+        id: signing
+        if: inputs.skip_signing != true
+        uses: ./.github/actions/setup-macos-signing
+        with:
+          certificate-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
       - name: "Install dependencies"
         run: npm ci
 
@@ -90,10 +98,20 @@ jobs:
           echo "Setting version to $NEW_VERSION"
           npm version $NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
 
-      - name: "Build"
+      - name: "Build and Sign"
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          # macOS signing variables (used by forge.config.ts)
+          APPLE_IDENTITY: ${{ steps.signing.outputs.identity }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          if [ -n "$APPLE_IDENTITY" ]; then
+            echo "Building with code signing identity: $APPLE_IDENTITY"
+          else
+            echo "Building without code signing (development mode)"
+          fi
           cd packages/app
           npm run make -- --platform darwin --arch arm64
 
