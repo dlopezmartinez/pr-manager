@@ -544,11 +544,27 @@ export const prerender = false;
     const stableBtn = document.getElementById(`channel-stable${suffix}`) as HTMLButtonElement;
     const betaBtn = document.getElementById(`channel-beta${suffix}`) as HTMLButtonElement;
 
-    // Show selector only if beta version is different from stable
-    if (betaData && stableData && betaData.version !== stableData.version) {
+    // Determine if we should show the selector
+    const hasStable = stableData && stableData.version;
+    const hasBeta = betaData && betaData.version;
+    const differentVersions = hasStable && hasBeta && betaData.version !== stableData.version;
+
+    // Show selector if both channels exist with different versions
+    // OR if only beta exists (so user knows they're getting beta)
+    if (differentVersions || (hasBeta && !hasStable)) {
       if (selector) selector.classList.remove('hidden');
 
-      if (stableBtn) {
+      // If only beta exists, select it by default and disable stable button
+      if (hasBeta && !hasStable) {
+        currentChannel = 'beta';
+        updateChannelButtons('beta', suffix);
+        if (stableBtn) {
+          stableBtn.classList.add('opacity-50', 'cursor-not-allowed');
+          stableBtn.title = 'No stable release available yet';
+        }
+      }
+
+      if (stableBtn && hasStable) {
         stableBtn.addEventListener('click', () => switchChannel('stable', suffix));
       }
       if (betaBtn) {
@@ -559,25 +575,41 @@ export const prerender = false;
 
   async function loadPublicDownloads() {
     try {
-      // Load both channels in parallel
+      // Load both channels in parallel (both can fail individually)
       const [stableResponse, betaResponse] = await Promise.all([
-        fetch(`${API_URL}/download/public/stable`),
+        fetch(`${API_URL}/download/public/stable`).catch(() => null),
         fetch(`${API_URL}/download/public/beta`).catch(() => null)
       ]);
 
-      if (!stableResponse.ok) {
-        throw new Error('Failed to fetch downloads');
+      // Parse responses if available
+      if (stableResponse && stableResponse.ok) {
+        stableData = await stableResponse.json();
       }
-
-      stableData = await stableResponse.json();
 
       if (betaResponse && betaResponse.ok) {
         betaData = await betaResponse.json();
       }
 
-      // Update with stable data by default
-      if (stableData) {
-        updateDownloadLinks(stableData, '-public');
+      // Determine which data to show by default
+      const hasStableDownloads = stableData && stableData.downloads &&
+        (stableData.downloads.mac || stableData.downloads.windows);
+      const hasBetaDownloads = betaData && betaData.downloads &&
+        (betaData.downloads.mac || betaData.downloads.windows);
+
+      // If no downloads available at all, show error
+      if (!hasStableDownloads && !hasBetaDownloads) {
+        console.error('No downloads available from either channel');
+        showState(errorState);
+        return;
+      }
+
+      // Use stable if available with downloads, otherwise use beta
+      if (hasStableDownloads) {
+        currentChannel = 'stable';
+        updateDownloadLinks(stableData!, '-public');
+      } else if (hasBetaDownloads) {
+        currentChannel = 'beta';
+        updateDownloadLinks(betaData!, '-public');
       }
 
       // Setup channel selector
@@ -592,26 +624,41 @@ export const prerender = false;
 
   async function loadAuthenticatedDownloads(token: string) {
     try {
-      // Load both channels in parallel
+      // Load both channels in parallel (both can fail individually)
       const [stableResponse, betaResponse] = await Promise.all([
-        fetch(`${API_URL}/download/public/stable`),
+        fetch(`${API_URL}/download/public/stable`).catch(() => null),
         fetch(`${API_URL}/download/public/beta`).catch(() => null)
       ]);
 
-      if (!stableResponse.ok) {
-        throw new Error('Failed to get downloads');
+      // Parse responses if available
+      if (stableResponse && stableResponse.ok) {
+        stableData = await stableResponse.json();
       }
-
-      stableData = await stableResponse.json();
 
       if (betaResponse && betaResponse.ok) {
         betaData = await betaResponse.json();
       }
 
-      // Update with stable data by default for both success and trial states
-      if (stableData) {
-        updateDownloadLinks(stableData, '');
-        updateDownloadLinks(stableData, '-trial');
+      // Determine which data to show by default
+      const hasStableDownloads = stableData && stableData.downloads &&
+        (stableData.downloads.mac || stableData.downloads.windows);
+      const hasBetaDownloads = betaData && betaData.downloads &&
+        (betaData.downloads.mac || betaData.downloads.windows);
+
+      // Use stable if available with downloads, otherwise use beta
+      if (hasStableDownloads) {
+        currentChannel = 'stable';
+        updateDownloadLinks(stableData!, '');
+        updateDownloadLinks(stableData!, '-trial');
+      } else if (hasBetaDownloads) {
+        currentChannel = 'beta';
+        updateDownloadLinks(betaData!, '');
+        updateDownloadLinks(betaData!, '-trial');
+      } else {
+        // No downloads available - show fallback text
+        if (versionText) versionText.textContent = 'Downloads temporarily unavailable';
+        const versionTextTrial = document.getElementById('version-text-trial') as HTMLParagraphElement;
+        if (versionTextTrial) versionTextTrial.textContent = 'Downloads temporarily unavailable';
       }
 
       // Setup channel selectors for both states
@@ -620,9 +667,9 @@ export const prerender = false;
     } catch (error) {
       console.error('Load downloads error:', error);
       // Don't fail completely, just show default version
-      if (versionText) versionText.textContent = 'Version: Latest';
+      if (versionText) versionText.textContent = 'Downloads temporarily unavailable';
       const versionTextTrial = document.getElementById('version-text-trial') as HTMLParagraphElement;
-      if (versionTextTrial) versionTextTrial.textContent = 'Version: Latest';
+      if (versionTextTrial) versionTextTrial.textContent = 'Downloads temporarily unavailable';
     }
   }
 

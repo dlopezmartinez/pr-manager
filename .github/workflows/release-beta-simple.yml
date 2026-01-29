@@ -69,6 +69,8 @@ jobs:
     name: "Build macOS"
     needs: prepare
     runs-on: macos-latest
+    env:
+      NEW_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,6 +84,11 @@ jobs:
 
       - name: "Install dependencies"
         run: npm ci
+
+      - name: "Update version before build"
+        run: |
+          echo "Setting version to $NEW_VERSION"
+          npm version $NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
 
       - name: "Build"
         env:
@@ -103,6 +110,8 @@ jobs:
     name: "Build Windows"
     needs: prepare
     runs-on: windows-latest
+    env:
+      NEW_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -116,6 +125,11 @@ jobs:
 
       - name: "Install dependencies"
         run: npm ci
+
+      - name: "Update version before build"
+        run: |
+          echo "Setting version to $env:NEW_VERSION"
+          npm version $env:NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
 
       - name: "Build"
         env:
@@ -138,6 +152,8 @@ jobs:
     name: "Build Linux"
     needs: prepare
     runs-on: ubuntu-latest
+    env:
+      NEW_VERSION: ${{ needs.prepare.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -151,6 +167,11 @@ jobs:
 
       - name: "Install dependencies"
         run: npm ci
+
+      - name: "Update version before build"
+        run: |
+          echo "Setting version to $NEW_VERSION"
+          npm version $NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
 
       - name: "Build"
         env:
@@ -230,9 +251,9 @@ jobs:
 
             | Platform | File |
             |----------|------|
-            | macOS | `PR-Manager-*.dmg` |
-            | Windows | `*-Setup.exe` |
-            | Linux | `.deb` / `.rpm` |
+            | macOS | `PR-Manager-${{ needs.prepare.outputs.version }}.dmg` |
+            | Windows | `PRManager-${{ needs.prepare.outputs.version }}-Setup.exe` |
+            | Linux | `pr-manager_${{ needs.prepare.outputs.version }}_amd64.deb` / `.rpm` |
           draft: false
           prerelease: true
           files: release-assets/*
