@@ -1,0 +1,4 @@
+---
+// Redirect from /success to /download for backwards compatibility
+return Astro.redirect('/download' + (Astro.url.search || ''));
+---

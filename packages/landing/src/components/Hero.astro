@@ -1,0 +1,184 @@
+---
+import MockAppWindow from './mockups/MockAppWindow.astro';
+---
+
+<section class="hero-section relative pt-32 pb-20 md:pt-40 md:pb-28 bg-background-alt" id="hero" aria-label="PR Manager - Your PRs, one click away">
+  <div class="max-w-7xl mx-auto px-6 lg:px-[120px]">
+    <!-- Content -->
+    <div class="flex flex-col items-center text-center">
+      <!-- Badge -->
+      <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border text-[13px] font-medium text-foreground-secondary mb-8 animate-on-scroll">
+        <span class="relative flex h-2 w-2" aria-hidden="true">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+        </span>
+        Available for macOS, Windows & Linux
+      </div>
+
+      <!-- Headline -->
+      <div class="max-w-[800px] animate-on-scroll">
+        <h1 class="text-5xl md:text-[64px] font-bold leading-[1.1] tracking-tight mb-4">
+          <span class="text-foreground">Your PRs,</span>
+          <br />
+          <span class="text-primary">one click away.</span>
+        </h1>
+        <p class="text-lg md:text-xl text-foreground-secondary leading-relaxed max-w-[600px] mx-auto">
+          A powerful menubar app that keeps all your Pull Requests from GitHub and GitLab organized. Ship faster, stay focused.
+        </p>
+      </div>
+
+      <!-- CTAs -->
+      <div class="flex flex-wrap items-center justify-center gap-4 mt-10 animate-on-scroll">
+        <a
+          href="/#pricing"
+          class="btn-primary inline-flex items-center gap-2 text-base"
+          aria-label="Start your free 7-day trial"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          Start Free Trial
+        </a>
+        <a
+          href="/#features"
+          class="btn-secondary inline-flex items-center gap-2 text-base"
+          aria-label="Learn more about PR Manager features"
+        >
+          Learn More
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Trust signals -->
+      <ul class="flex flex-wrap items-center justify-center gap-8 mt-10 text-sm text-foreground-secondary animate-on-scroll" aria-label="Benefits">
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+          </svg>
+          Setup in minutes
+        </li>
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+          </svg>
+          7-day free trial
+        </li>
+        <li class="flex items-center gap-2">
+          <svg class="w-4 h-4 text-success" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+          </svg>
+          Cancel anytime
+        </li>
+      </ul>
+
+      <!-- Product Mockup -->
+      <div class="hero-mockup-container mt-12 md:mt-16 w-full animate-on-scroll">
+        <!-- Glow Effect -->
+        <div class="hero-glow" aria-hidden="true"></div>
+
+        <!-- Floating App Window -->
+        <div class="hero-mockup">
+          <MockAppWindow theme="light" />
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero-section {
+    overflow: hidden;
+  }
+
+  .hero-mockup-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    perspective: 1000px;
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 80%;
+    height: 80%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(ellipse at center, rgba(88, 101, 242, 0.25) 0%, rgba(124, 58, 237, 0.15) 30%, transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .hero-mockup {
+    position: relative;
+    z-index: 1;
+    max-width: 750px;
+    width: 100%;
+    animation: heroFloat 6s ease-in-out infinite;
+    transform-style: preserve-3d;
+  }
+
+  .hero-mockup:hover {
+    animation-play-state: paused;
+  }
+
+  @keyframes heroFloat {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero-mockup {
+      max-width: 100%;
+    }
+
+    @keyframes heroFloat {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+  }
+</style>
+
+<script>
+  // Theme sync for Hero mockup
+  function updateHeroMockupTheme() {
+    const isDark = document.documentElement.classList.contains('dark');
+    const theme = isDark ? 'dark' : 'light';
+
+    document.querySelectorAll('.hero-mockup .mock-app-window').forEach(el => {
+      el.classList.remove('theme-light', 'theme-dark');
+      el.classList.add(`theme-${theme}`);
+      el.setAttribute('data-theme', theme);
+    });
+  }
+
+  // Initial theme sync
+  updateHeroMockupTheme();
+
+  // Watch for theme changes
+  const heroThemeObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.attributeName === 'class') {
+        updateHeroMockupTheme();
+      }
+    });
+  });
+
+  heroThemeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class']
+  });
+</script>

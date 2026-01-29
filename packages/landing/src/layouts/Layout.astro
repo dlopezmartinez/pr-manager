@@ -1,0 +1,374 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  keywords?: string;
+}
+
+const {
+  title,
+  description = 'PR Manager is a powerful desktop app for developers to manage Pull Requests across GitHub and GitLab. Real-time notifications, custom views, and seamless CI/CD integration.',
+  keywords = 'pull request manager, PR dashboard, GitHub PR app, GitLab merge request, code review tool, developer productivity, menubar app, desktop PR manager, git workflow, code collaboration'
+} = Astro.props;
+
+const siteName = 'PR Manager';
+const siteUrl = 'https://prmanagerhub.com';
+---
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- Primary Meta Tags -->
+    <title>{title}</title>
+    <meta name="title" content={title} />
+    <meta name="description" content={description} />
+    <meta name="keywords" content={keywords} />
+    <meta name="author" content="PR Manager" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href={siteUrl} />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={siteUrl} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={`${siteUrl}/og-image.png`} />
+    <meta property="og:site_name" content={siteName} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content={siteUrl} />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={`${siteUrl}/og-image.png`} />
+
+    <!-- Additional head content from child layouts -->
+    <slot name="head" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+    <!-- Theme initialization (runs before page renders to prevent flash) -->
+    <script is:inline>
+      (function() {
+        const stored = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = stored || (prefersDark ? 'dark' : 'light');
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      })();
+    </script>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "PR Manager",
+        "description": "A powerful desktop app for developers to manage Pull Requests across GitHub and GitLab",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Windows, Linux",
+        "offers": {
+          "@type": "Offer",
+          "price": "2.99",
+          "priceCurrency": "EUR"
+        }
+      }
+    </script>
+  </head>
+  <body class="bg-background text-foreground antialiased overflow-x-hidden transition-colors duration-300">
+    <!-- Skip to main content link for accessibility -->
+    <a href="#main-content" class="skip-link">
+      Skip to main content
+    </a>
+
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  /* ========== CSS VARIABLES FOR THEMING ========== */
+  :root {
+    /* Light mode (default) */
+    --color-background: #FFFFFF;
+    --color-background-alt: #FAFAFA;
+    --color-foreground: #111827;
+    --color-foreground-secondary: #6B7280;
+    --color-foreground-muted: #9CA3AF;
+    --color-card: #F9FAFB;
+    --color-border: #E5E7EB;
+  }
+
+  .dark {
+    /* Dark mode */
+    --color-background: #0D0D0D;
+    --color-background-alt: #111111;
+    --color-foreground: #F9FAFB;
+    --color-foreground-secondary: #9CA3AF;
+    --color-foreground-muted: #6B7280;
+    --color-card: #1A1A1A;
+    --color-border: #2A2A2A;
+  }
+
+  /* ========== BASE ========== */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  /* ========== SKIP LINK (Accessibility) ========== */
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    padding: 1rem 2rem;
+    background: #6366F1;
+    color: white;
+    font-weight: 600;
+    border-radius: 0 0 0.5rem 0.5rem;
+    text-decoration: none;
+    transition: top 0.2s ease;
+  }
+
+  .skip-link:focus {
+    top: 0;
+    outline: 2px solid white;
+    outline-offset: 2px;
+  }
+
+  /* ========== GLASS CARD ========== */
+  .glass-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    position: relative;
+    transition: all 0.3s ease;
+  }
+
+  .glass-card:hover {
+    border-color: rgba(99, 102, 241, 0.3);
+    box-shadow: 0 0 40px rgba(99, 102, 241, 0.1);
+  }
+
+  .dark .glass-card {
+    background: rgba(26, 26, 26, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* ========== GRADIENT TEXT ========== */
+  .gradient-text {
+    background: linear-gradient(135deg, #6366F1 0%, #EC4899 50%, #8B5CF6 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradient-flow 6s ease infinite;
+  }
+
+  @keyframes gradient-flow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  /* Logo Gradient (static) */
+  .logo-gradient {
+    background: linear-gradient(135deg, #6366F1 0%, #EC4899 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* ========== SCROLL ANIMATIONS ========== */
+  .animate-on-scroll {
+    opacity: 0;
+    transform: translateY(30px);
+    transition:
+      opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-on-scroll.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Stagger children */
+  .stagger-children > .animate-on-scroll:nth-child(1) { transition-delay: 0.0s; }
+  .stagger-children > .animate-on-scroll:nth-child(2) { transition-delay: 0.1s; }
+  .stagger-children > .animate-on-scroll:nth-child(3) { transition-delay: 0.2s; }
+  .stagger-children > .animate-on-scroll:nth-child(4) { transition-delay: 0.3s; }
+  .stagger-children > .animate-on-scroll:nth-child(5) { transition-delay: 0.4s; }
+  .stagger-children > .animate-on-scroll:nth-child(6) { transition-delay: 0.5s; }
+
+  /* ========== FEATURE CARDS ========== */
+  .feature-card {
+    transition:
+      transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 0.4s ease,
+      border-color 0.3s ease;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-6px);
+  }
+
+  /* ========== BUTTONS ========== */
+  .btn-primary {
+    background-color: #111827;
+    color: white;
+    padding: 0.875rem 1.75rem;
+    border-radius: 0.625rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+
+  .dark .btn-primary {
+    background-color: white;
+    color: #111827;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.5);
+  }
+
+  .btn-secondary {
+    background-color: transparent;
+    color: var(--color-foreground);
+    padding: 0.875rem 1.75rem;
+    border-radius: 0.625rem;
+    font-weight: 500;
+    border: 1px solid var(--color-border);
+    transition: all 0.3s ease;
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--color-card);
+    border-color: rgba(99, 102, 241, 0.3);
+  }
+
+  /* ========== CUSTOM SCROLLBAR ========== */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-background);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-foreground-muted);
+  }
+
+  /* ========== SELECTION ========== */
+  ::selection {
+    background: rgba(99, 102, 241, 0.3);
+    color: var(--color-foreground);
+  }
+
+  /* ========== FOCUS STYLES (Accessibility) ========== */
+  a:focus-visible,
+  button:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid #6366F1;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Remove default outline when using mouse */
+  a:focus:not(:focus-visible),
+  button:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* ========== FORM INPUTS ========== */
+  .input {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    color: var(--color-foreground);
+    transition: all 0.2s ease;
+  }
+
+  .input:focus {
+    outline: none;
+    border-color: #6366F1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  }
+
+  .input::placeholder {
+    color: var(--color-foreground-muted);
+  }
+
+  /* ========== REDUCED MOTION ========== */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .animate-on-scroll {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // ========== SCROLL ANIMATIONS ==========
+    const scrollObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -10% 0px' }
+    );
+
+    document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+      scrollObserver.observe(el);
+    });
+  });
+
+  // Re-initialize on Astro page navigation
+  document.addEventListener('astro:page-load', () => {
+    const scrollObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -10% 0px' }
+    );
+
+    document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+      scrollObserver.observe(el);
+    });
+  });
+</script>

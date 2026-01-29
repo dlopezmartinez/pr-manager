@@ -1,0 +1,76 @@
+---
+const links = {
+  product: [
+    { name: 'Features', href: '/#features' },
+    { name: 'Pricing', href: '/#pricing' },
+    { name: 'Download', href: '/success' },
+    { name: 'Blog', href: '/blog' },
+  ],
+  legal: [
+    { name: 'Privacy Policy', href: '/privacy' },
+    { name: 'Terms of Service', href: '/terms' },
+  ],
+};
+---
+
+<footer class="relative border-t border-border bg-card" role="contentinfo">
+  <div class="max-w-7xl mx-auto px-6 lg:px-[120px] py-16">
+    <div class="flex flex-col md:flex-row justify-between gap-12 mb-12">
+      <!-- Brand -->
+      <div class="max-w-[300px]">
+        <a href="/" class="flex items-center gap-2.5 group mb-4" aria-label="PR Manager - Go to homepage">
+          <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="3" fill="currentColor" stroke="none"/>
+              <circle cx="18" cy="18" r="3" fill="currentColor" stroke="none"/>
+              <path d="M6 9v6c0 2 2 3 4 3h4" stroke="currentColor" stroke-width="2.5"/>
+              <path d="M18 15V9c0-2-2-3-4-3h-1" stroke="currentColor" stroke-width="2.5"/>
+            </svg>
+          </div>
+          <span class="text-lg font-semibold text-foreground">PR Manager</span>
+        </a>
+        <p class="text-foreground-secondary text-sm leading-relaxed">
+          A powerful desktop app that keeps all your Pull Requests from GitHub and GitLab organized in your menubar.
+        </p>
+      </div>
+
+      <!-- Links -->
+      <div class="flex gap-20">
+        <!-- Product Links -->
+        <nav aria-label="Product navigation">
+          <h4 class="text-foreground font-semibold text-sm mb-4">Product</h4>
+          <ul class="space-y-3">
+            {links.product.map((link) => (
+              <li>
+                <a href={link.href} class="text-foreground-secondary hover:text-foreground text-sm transition-colors">
+                  {link.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <!-- Legal Links -->
+        <nav aria-label="Legal navigation">
+          <h4 class="text-foreground font-semibold text-sm mb-4">Legal</h4>
+          <ul class="space-y-3">
+            {links.legal.map((link) => (
+              <li>
+                <a href={link.href} class="text-foreground-secondary hover:text-foreground text-sm transition-colors">
+                  {link.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="pt-6 border-t border-border">
+      <p class="text-sm text-foreground-muted text-center md:text-left">
+        &copy; {new Date().getFullYear()} PR Manager. All rights reserved.
+      </p>
+    </div>
+  </div>
+</footer>
