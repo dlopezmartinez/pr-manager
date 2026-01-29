@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { captureException } from '../lib/sentry';
 
 // Lazy load safeStorage to avoid triggering Keychain access on import
 let _safeStorage: typeof import('electron').safeStorage | null = null;
@@ -71,6 +72,7 @@ export function setSecureValue(key: string, value: string): boolean {
     return true;
   } catch (error) {
     console.error('[SecureStorage] Error encrypting value for key:', key, error);
+    captureException(error as Error, { context: 'secureStorage:encrypt', key });
     return false;
   }
 }
@@ -99,6 +101,7 @@ export function getSecureValue(key: string): string | null {
     return decrypted;
   } catch (error) {
     console.error('[SecureStorage] Error decrypting value for key:', key, error);
+    captureException(error as Error, { context: 'secureStorage:decrypt', key });
     return null;
   }
 }
@@ -198,6 +201,7 @@ export function verifyKeychainAccess(): { success: boolean; error?: string } {
       return { success: false, error: 'Keychain item not found or corrupted' };
     }
 
+    captureException(error as Error, { context: 'secureStorage:verifyKeychainAccess' });
     return { success: false, error: `Keychain access failed: ${errorMessage}` };
   }
 }
