@@ -1,6 +1,9 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Header from '../components/Header.astro';
+
+// Server-render to read BETA_MODE env var at runtime
+export const prerender = false;
 ---
 
 <Layout title="Sign In - PR Manager" description="Sign in to your PR Manager account.">

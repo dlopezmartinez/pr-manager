@@ -42,6 +42,10 @@
         </template>
       </TitleBar>
 
+      <StatusBanner
+        @require-login="handleRequireLogin"
+      />
+
       <TrialBanner />
 
       <header class="header">
@@ -103,6 +107,9 @@
     />
 
     <InAppNotification />
+
+    <!-- Blocking modal when sync is required (12h usage or session replaced) -->
+    <SyncRequiredModal />
     </div>
   </ErrorBoundary>
 </template>
@@ -133,7 +140,9 @@ import InAppNotification from './components/InAppNotification.vue';
 import NotificationInbox from './components/NotificationInbox.vue';
 import PinnedPRsView from './components/PinnedPRsView.vue';
 import TrialBanner from './components/TrialBanner.vue';
+import StatusBanner from './components/StatusBanner.vue';
 import AdminDashboard from './components/AdminDashboard.vue';
+import SyncRequiredModal from './components/SyncRequiredModal.vue';
 import { getApiKey, clearApiKey, updateConfig } from './stores/configStore';
 import { ProviderFactory } from './providers';
 import { isNotificationsView, isPinnedView } from './config/default-views';
@@ -305,6 +314,19 @@ function handleLogout() {
   authHealthPolling.stopPolling();
   clearAllViewStates();
   routerStore.navigate('login');
+}
+
+async function handleOpenBilling() {
+  try {
+    await authStore.openCustomerPortal();
+  } catch (error) {
+    console.error('[App] Failed to open billing portal:', error);
+  }
+}
+
+function handleRequireLogin() {
+  // Session/subscription warning - force re-login
+  handleLogout();
 }
 
 function handleProviderChanged() {

@@ -7,6 +7,8 @@ import { generateTokens } from '../../../src/middleware/auth.js';
 
 describe('Auth Routes', () => {
   const app = createApp();
+  const TEST_DEVICE_ID = 'test-device-id-12345';
+  const TEST_DEVICE_NAME = 'Test Device';
 
   describe('POST /auth/signup', () => {
     it('should create a new user account', async () => {
@@ -16,6 +18,8 @@ describe('Auth Routes', () => {
           email: 'newuser@test.com',
           password: 'SecurePass123!',
           name: 'New User',
+          deviceId: TEST_DEVICE_ID,
+          deviceName: TEST_DEVICE_NAME,
         });
 
       expect(res.status).toBe(201);
@@ -36,6 +40,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'UPPERCASE@TEST.COM',
           password: 'SecurePass123!',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(201);
@@ -50,6 +55,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'existing@test.com',
           password: 'SecurePass123!',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(400);
@@ -63,6 +69,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'not-an-email',
           password: 'SecurePass123!',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(400);
@@ -75,6 +82,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'weakpass@test.com',
           password: '1234567',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(400);
@@ -86,6 +94,7 @@ describe('Auth Routes', () => {
         .post('/auth/signup')
         .send({
           password: 'SecurePass123!',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(400);
@@ -96,6 +105,7 @@ describe('Auth Routes', () => {
         .post('/auth/signup')
         .send({
           email: 'nopass@test.com',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(400);
@@ -107,6 +117,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'jwttest@test.com',
           password: 'SecurePass123!',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(201);
@@ -130,6 +141,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'login@test.com',
           password: 'password123',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(200);
@@ -145,6 +157,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'LOGIN@TEST.COM',
           password: 'password123',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(200);
@@ -157,6 +170,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'login@test.com',
           password: 'wrongpassword',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(401);
@@ -169,6 +183,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'nonexistent@test.com',
           password: 'password123',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(401);
@@ -181,6 +196,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'not-an-email',
           password: 'password123',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(400);
@@ -192,6 +208,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'login@test.com',
           password: '',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(res.status).toBe(400);
@@ -273,6 +290,7 @@ describe('Auth Routes', () => {
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: TEST_DEVICE_ID,
       });
 
       const res = await request(app)
@@ -377,6 +395,7 @@ describe('Auth Routes', () => {
         .send({
           email: 'changepass@test.com',
           password: 'NewSecurePass456!',
+          deviceId: TEST_DEVICE_ID,
         });
 
       expect(loginRes.status).toBe(200);
@@ -427,6 +446,7 @@ describe('Auth Routes', () => {
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: TEST_DEVICE_ID,
       });
 
       // Get session count before
@@ -470,6 +490,7 @@ describe('Auth Routes', () => {
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: TEST_DEVICE_ID,
       });
 
       const res = await request(app)
@@ -494,6 +515,7 @@ describe('Auth Routes', () => {
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: TEST_DEVICE_ID,
       });
 
       const res = await request(app)
@@ -517,16 +539,18 @@ describe('Auth Routes', () => {
     it('should logout from all devices', async () => {
       const user = await createTestUser({ email: 'logoutall@test.com' });
 
-      // Create multiple sessions
+      // Create multiple sessions (different deviceIds to have multiple active sessions)
       const tokens1 = await generateTokens({
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: 'device-1',
       });
       const tokens2 = await generateTokens({
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: 'device-2',
       });
 
       // Verify multiple sessions exist
@@ -564,6 +588,7 @@ describe('Auth Routes', () => {
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: TEST_DEVICE_ID,
       });
 
       const res = await request(app)
@@ -596,6 +621,7 @@ describe('Auth Routes', () => {
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: TEST_DEVICE_ID,
       });
 
       // Get session ID
@@ -628,11 +654,13 @@ describe('Auth Routes', () => {
         userId: user1.id,
         email: user1.email,
         role: user1.role,
+        deviceId: 'device-user1',
       });
       const tokens2 = await generateTokens({
         userId: user2.id,
         email: user2.email,
         role: user2.role,
+        deviceId: 'device-user2',
       });
 
       // Get user2's session
@@ -657,6 +685,7 @@ describe('Auth Routes', () => {
         userId: user.id,
         email: user.email,
         role: user.role,
+        deviceId: TEST_DEVICE_ID,
       });
 
       const res = await request(app)

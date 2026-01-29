@@ -88,6 +88,19 @@
                 </button>
               </div>
             </div>
+
+            <div class="setting-row">
+              <div class="setting-info">
+                <label>Session Status</label>
+                <p class="setting-description">Connection and subscription health</p>
+              </div>
+              <div class="setting-control">
+                <span class="session-status" :class="sessionHealthClass">
+                  <span class="status-dot" :class="sessionHealthClass"></span>
+                  {{ sessionHealthText }}
+                </span>
+              </div>
+            </div>
           </section>
 
           <section class="settings-section">
@@ -520,6 +533,7 @@ import TitleBar from './TitleBar.vue';
 import type { TokenValidationResult } from '../utils/electron';
 import { configStore, updateConfig, saveApiKey, clearApiKey, getApiKey } from '../stores/configStore';
 import { authStore } from '../stores/authStore';
+import { sessionManager } from '../services/sessionManager';
 import { showNotification, isElectron, setZoomLevel, getZoomLevel, validateToken as validateTokenAPI, openExternal, getAppVersion, getPlatform } from '../utils/electron';
 import { followedCount, clearAllFollowed } from '../stores/followUpStore';
 import { ProviderFactory } from '../providers';
@@ -757,6 +771,29 @@ function showTestFeedback(type: 'pr' | 'comment') {
 }
 
 const followedPRsCount = computed(() => followedCount.value);
+
+// Session health for status indicator
+const sessionHealthClass = computed(() => {
+  const health = sessionManager.healthLevel.value;
+  return {
+    'healthy': health === 'healthy',
+    'degraded': health === 'degraded',
+    'critical': health === 'critical',
+  };
+});
+
+const sessionHealthText = computed(() => {
+  const health = sessionManager.healthLevel.value;
+  const isOnline = sessionManager.isOnline.value;
+
+  if (health === 'healthy') {
+    return 'OK';
+  } else if (health === 'degraded') {
+    return isOnline ? 'Degraded' : 'Offline';
+  } else {
+    return 'Critical';
+  }
+});
 
 function handleClearFollowed() {
   clearAllFollowed();
@@ -1488,5 +1525,59 @@ function handleClearFollowed() {
 .text-btn.danger:hover {
   background: var(--color-error-bg);
   border-radius: var(--radius-sm);
+}
+
+.session-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.session-status.healthy {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.session-status.degraded {
+  background: var(--color-warning-bg, rgba(245, 158, 11, 0.1));
+  color: var(--color-warning, #f59e0b);
+}
+
+.session-status.critical {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.healthy {
+  background: var(--color-success);
+}
+
+.status-dot.degraded {
+  background: var(--color-warning, #f59e0b);
+}
+
+.status-dot.critical {
+  background: var(--color-error);
+  animation: pulse-critical 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-critical {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 </style>

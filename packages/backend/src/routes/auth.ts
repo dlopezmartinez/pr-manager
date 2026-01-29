@@ -7,7 +7,7 @@ import { prisma } from '../lib/prisma.js';
 import logger from '../lib/logger.js';
 import { ApiError, ErrorCodes, validationError, Errors } from '../lib/errors.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { generateTokens, verifyRefreshToken, authenticate, JWTPayload, AUTH_ERROR_CODES } from '../middleware/auth.js';
+import { generateTokens, verifyRefreshToken, authenticate, JWTPayload, AUTH_ERROR_CODES, getSubscriptionClaims, generateAccessToken, verifyDeviceSession, updateSessionSync } from '../middleware/auth.js';
 import { loginLimiter, signupLimiter, passwordChangeLimiter, forgotPasswordLimiter } from '../middleware/rateLimit.js';
 import { sendEmail } from '../services/emailService.js';
 import { passwordResetTemplate } from '../templates/emails.js';
@@ -18,11 +18,19 @@ const signupSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
   password: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password too long'),
   name: z.string().min(1, 'Name is required').max(255, 'Name too long').optional(),
+  // deviceId is optional for web clients (landing page)
+  // When provided, enables single-session enforcement
+  deviceId: z.string().min(1).max(255, 'Device ID too long').optional(),
+  deviceName: z.string().max(255, 'Device name too long').optional(),
 });
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address').max(255, 'Email too long'),
   password: z.string().min(1, 'Password is required').max(255, 'Password too long'),
+  // deviceId is optional for web clients (landing page)
+  // When provided, enables single-session enforcement
+  deviceId: z.string().min(1).max(255, 'Device ID too long').optional(),
+  deviceName: z.string().max(255, 'Device name too long').optional(),
 });
 
 const verifyTokenSchema = z.object({
@@ -38,7 +46,7 @@ router.post('/signup', signupLimiter, asyncHandler(async (req: Request, res: Res
     throw validationError(validation.error.errors);
   }
 
-  const { email, password, name } = validation.data;
+  const { email, password, name, deviceId, deviceName } = validation.data;
 
   const existingUser = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
@@ -50,12 +58,16 @@ router.post('/signup', signupLimiter, asyncHandler(async (req: Request, res: Res
 
   const passwordHash = await bcrypt.hash(password, 12);
 
+  // Beta mode: create users with BETA role for free access during soft launch
+  const isBetaMode = process.env.BETA_MODE === 'true';
+
   const user = await prisma.$transaction(async (tx) => {
     return await tx.user.create({
       data: {
         email: email.toLowerCase(),
         passwordHash,
         name,
+        ...(isBetaMode && { role: 'BETA' }),
       },
       select: {
         id: true,
@@ -71,11 +83,14 @@ router.post('/signup', signupLimiter, asyncHandler(async (req: Request, res: Res
     userId: user.id,
     email: user.email,
     role: user.role,
+    deviceId,
+    deviceName,
   });
 
   res.status(201).json({
     accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
+    // Only include refreshToken for app logins (when deviceId provided)
+    ...(tokens.refreshToken && { refreshToken: tokens.refreshToken }),
     expiresIn: tokens.expiresIn,
     user: {
       id: user.id,
@@ -95,7 +110,7 @@ router.post('/login', loginLimiter, asyncHandler(async (req: Request, res: Respo
     throw validationError(validation.error.errors);
   }
 
-  const { email, password } = validation.data;
+  const { email, password, deviceId, deviceName } = validation.data;
 
   const user = await prisma.user.findUnique({
     where: { email: email.toLowerCase() },
@@ -127,11 +142,14 @@ router.post('/login', loginLimiter, asyncHandler(async (req: Request, res: Respo
     userId: user.id,
     email: user.email,
     role: user.role,
+    deviceId,
+    deviceName,
   });
 
   res.json({
     accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
+    // Only include refreshToken for app logins (when deviceId provided)
+    ...(tokens.refreshToken && { refreshToken: tokens.refreshToken }),
     expiresIn: tokens.expiresIn,
     user: {
       id: user.id,
@@ -231,6 +249,67 @@ router.get('/health', authenticate, (req: Request, res: Response) => {
 });
 
 // =============================================================================
+// GET /auth/sync
+// Returns a new JWT with updated subscription claims
+// Requires X-Device-Id header to verify active session
+// =============================================================================
+router.get('/sync', authenticate, asyncHandler(async (req: Request, res: Response) => {
+  const deviceId = req.headers['x-device-id'] as string;
+
+  if (!deviceId) {
+    res.status(400).json({
+      error: 'Device ID required',
+      code: AUTH_ERROR_CODES.DEVICE_ID_REQUIRED,
+    });
+    return;
+  }
+
+  // Verify this device has an active session
+  const sessionResult = await verifyDeviceSession(req.user!.userId, deviceId);
+
+  if (!sessionResult.valid) {
+    res.status(403).json({
+      error: sessionResult.errorMessage,
+      code: sessionResult.errorCode,
+    });
+    return;
+  }
+
+  // Update lastSyncAt for this session
+  await updateSessionSync(sessionResult.sessionId!);
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.userId },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+    },
+  });
+
+  if (!user) {
+    throw Errors.userNotFound();
+  }
+
+  // Get fresh subscription claims
+  const subscription = await getSubscriptionClaims(user.id);
+
+  // Generate new access token with updated claims
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+    subscription,
+  });
+
+  res.json({
+    accessToken,
+    expiresIn: 7 * 24 * 60 * 60, // 7 days in seconds
+    subscription,
+  });
+}));
+
+// =============================================================================
 // POST /auth/change-password
 // =============================================================================
 router.post('/change-password', authenticate, passwordChangeLimiter, asyncHandler(async (req: Request, res: Response) => {
@@ -320,11 +399,13 @@ router.post('/refresh', asyncHandler(async (req: Request, res: Response) => {
     userId: user.id,
     email: user.email,
     role: user.role,
+    deviceId: result.deviceId ?? undefined,
+    deviceName: result.deviceName ?? undefined,
   });
 
   res.json({
     accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
+    ...(tokens.refreshToken && { refreshToken: tokens.refreshToken }),
     expiresIn: tokens.expiresIn,
   });
 }));

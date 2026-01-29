@@ -5,8 +5,7 @@ import {
   requiresLogout,
   canRefreshToken,
 } from '../types/errors';
-
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.prmanagerhub.com';
+import { API_URL } from '../config/api';
 
 let isRefreshing = false;
 let refreshSubscribers: Array<() => void> = [];

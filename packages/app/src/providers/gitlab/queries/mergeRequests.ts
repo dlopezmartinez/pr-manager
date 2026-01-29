@@ -161,6 +161,8 @@ export const MR_DETAILS_QUERY = `
         approved
         approvalsRequired
         approvalsLeft
+        # Commit count for change detection
+        commitCount
         diffStatsSummary {
           additions
           deletions
@@ -346,6 +348,8 @@ export const MR_APPROVALS_QUERY = `
 export const MR_MERGE_STATUS_QUERY = `
   query MergeRequestMergeStatus($projectPath: ID!, $iid: String!) {
     project(fullPath: $projectPath) {
+      squashOption
+      mergeMethod
       mergeRequest(iid: $iid) {
         id
         iid

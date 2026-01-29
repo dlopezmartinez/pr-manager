@@ -1,7 +1,6 @@
 import type { AuthUser } from '../preload';
 import { httpPost, httpGet } from './http';
-
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.prmanager.app';
+import { API_URL } from '../config/api';
 
 export interface AuthResponse {
   accessToken: string;
@@ -59,10 +58,16 @@ class AuthService {
   }
 
   async signup(email: string, password: string, name?: string): Promise<AuthResponse> {
+    // Get device info for session tracking
+    const deviceId = await window.electronAPI.session.getDeviceId();
+    const deviceName = await window.electronAPI.session.getDeviceName();
+
     const response = await httpPost(`${API_URL}/auth/signup`, {
       email,
       password,
       name,
+      deviceId,
+      deviceName,
     });
 
     if (!response.ok) {
@@ -76,9 +81,15 @@ class AuthService {
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
+    // Get device info for session tracking
+    const deviceId = await window.electronAPI.session.getDeviceId();
+    const deviceName = await window.electronAPI.session.getDeviceName();
+
     const response = await httpPost(`${API_URL}/auth/login`, {
       email,
       password,
+      deviceId,
+      deviceName,
     });
 
     if (!response.ok) {
