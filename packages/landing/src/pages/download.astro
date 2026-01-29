@@ -547,7 +547,7 @@ export const prerender = false;
     // Determine if we should show the selector
     const hasStable = stableData && stableData.version;
     const hasBeta = betaData && betaData.version;
-    const differentVersions = hasStable && hasBeta && betaData.version !== stableData.version;
+    const differentVersions = hasStable && hasBeta && betaData!.version !== stableData!.version;
 
     // Show selector if both channels exist with different versions
     // OR if only beta exists (so user knows they're getting beta)
