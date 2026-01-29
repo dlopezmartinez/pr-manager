@@ -75,8 +75,22 @@ if (process.platform === 'win32') {
   }
 }
 
-import { initSentryMain } from './lib/sentry';
+import { initSentryMain, captureException, captureMessage } from './lib/sentry';
 initSentryMain();
+
+// =============================================================================
+// GLOBAL ERROR HANDLERS - Capture all uncaught errors and send to Sentry
+// =============================================================================
+process.on('uncaughtException', (error: Error) => {
+  console.error('[Main] Uncaught Exception:', error);
+  captureException(error, { context: 'uncaughtException', fatal: true });
+});
+
+process.on('unhandledRejection', (reason: unknown) => {
+  console.error('[Main] Unhandled Rejection:', reason);
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  captureException(error, { context: 'unhandledRejection' });
+});
 
 import { initAutoUpdater, setUpdateToken } from './lib/autoUpdater';
 
@@ -171,6 +185,31 @@ function isTrayAvailable(): boolean {
   return tray !== null && !tray.isDestroyed();
 }
 
+function isNativeImageValid(image: Electron.NativeImage | null): boolean {
+  return image !== null && !image.isEmpty();
+}
+
+function safeSetTrayImage(image: Electron.NativeImage | null): void {
+  if (!isTrayAvailable() || !isNativeImageValid(image)) return;
+  try {
+    tray!.setImage(image!);
+  } catch (error) {
+    console.error('Failed to set tray image:', error);
+    captureException(error as Error, { context: 'safeSetTrayImage' });
+    // Try to recreate the icon
+    try {
+      normalIcon = createTrayIcon();
+      syncingFrames = createSyncingIconFrames(12);
+      if (isNativeImageValid(normalIcon)) {
+        tray!.setImage(normalIcon!);
+      }
+    } catch (recreateError) {
+      console.error('Failed to recreate tray icon:', recreateError);
+      captureException(recreateError as Error, { context: 'safeSetTrayImage:recreate' });
+    }
+  }
+}
+
 function createWindow(): void {
   const windowConfig = getWindowConfig();
   const savedBounds = loadWindowBounds();
@@ -239,13 +278,20 @@ function createWindow(): void {
     showWindowCentered();
   });
 
-  // Debug: log if renderer crashes
+  // Critical: log renderer crashes to Sentry
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('[Main] Renderer process gone:', details.reason, details.exitCode);
+    captureMessage(`Renderer process gone: ${details.reason}`, 'error');
+    captureException(new Error(`Renderer crashed: ${details.reason}`), {
+      context: 'render-process-gone',
+      reason: details.reason,
+      exitCode: details.exitCode,
+    });
   });
 
   mainWindow.webContents.on('unresponsive', () => {
     console.error('[Main] Renderer became unresponsive');
+    captureMessage('Renderer became unresponsive', 'warning');
   });
 
   mainWindow.webContents.on('responsive', () => {
@@ -298,7 +344,12 @@ function createTray(): void {
   tray.setToolTip(APP_NAME);
 
   tray.on('click', () => {
-    toggleWindow();
+    try {
+      toggleWindow();
+    } catch (error) {
+      console.error('Error in tray click handler:', error);
+      captureException(error as Error, { context: 'tray:click' });
+    }
   });
 
   const contextMenu = Menu.buildFromTemplate([
@@ -308,35 +359,69 @@ function createTray(): void {
   ]);
 
   tray.on('right-click', () => {
-    if (isTrayAvailable()) tray!.popUpContextMenu(contextMenu);
+    try {
+      if (isTrayAvailable()) tray!.popUpContextMenu(contextMenu);
+    } catch (error) {
+      console.error('Error in tray right-click handler:', error);
+      captureException(error as Error, { context: 'tray:right-click' });
+    }
   });
 }
 
 function setupIpcHandlers(): void {
   ipcMain.on('update-pr-count', (_, count: number) => {
     if (isTrayAvailable()) {
-      if (supportsTrayTitle()) {
-        tray!.setTitle(count > 0 ? ` ${count}` : '');
+      try {
+        if (supportsTrayTitle()) {
+          tray!.setTitle(count > 0 ? ` ${count}` : '');
+        }
+        const tooltip = count > 0 ? `${APP_NAME} - ${count} PRs` : APP_NAME;
+        tray!.setToolTip(tooltip);
+      } catch (error) {
+        console.error('Error updating tray count:', error);
+        captureException(error as Error, { context: 'tray:update-pr-count' });
       }
-      const tooltip = count > 0 ? `${APP_NAME} - ${count} PRs` : APP_NAME;
-      tray!.setToolTip(tooltip);
     }
   });
 
-  ipcMain.handle('secure-storage:get', (_, key: string) => {
-    return getSecureValue(key);
+  ipcMain.handle('secure-storage:get', async (_, key: string) => {
+    try {
+      return await getSecureValue(key);
+    } catch (error) {
+      console.error('[Main] secure-storage:get error:', error);
+      captureException(error as Error, { context: 'ipc:secure-storage:get', key });
+      throw error;
+    }
   });
 
-  ipcMain.handle('secure-storage:set', (_, key: string, value: string) => {
-    return setSecureValue(key, value);
+  ipcMain.handle('secure-storage:set', async (_, key: string, value: string) => {
+    try {
+      return await setSecureValue(key, value);
+    } catch (error) {
+      console.error('[Main] secure-storage:set error:', error);
+      captureException(error as Error, { context: 'ipc:secure-storage:set', key });
+      throw error;
+    }
   });
 
-  ipcMain.handle('secure-storage:delete', (_, key: string) => {
-    return deleteSecureValue(key);
+  ipcMain.handle('secure-storage:delete', async (_, key: string) => {
+    try {
+      return await deleteSecureValue(key);
+    } catch (error) {
+      console.error('[Main] secure-storage:delete error:', error);
+      captureException(error as Error, { context: 'ipc:secure-storage:delete', key });
+      throw error;
+    }
   });
 
   ipcMain.handle('secure-storage:is-available', () => {
-    return isEncryptionAvailable();
+    try {
+      return isEncryptionAvailable();
+    } catch (error) {
+      console.error('[Main] secure-storage:is-available error:', error);
+      captureException(error as Error, { context: 'ipc:secure-storage:is-available' });
+      return false;
+    }
   });
 
   ipcMain.handle('validate-token', async (
@@ -345,62 +430,122 @@ function setupIpcHandlers(): void {
     token: string,
     baseUrl?: string
   ): Promise<TokenValidationResult> => {
-    return validateToken(provider, token, baseUrl);
+    try {
+      return await validateToken(provider, token, baseUrl);
+    } catch (error) {
+      console.error('[Main] validate-token error:', error);
+      captureException(error as Error, { context: 'ipc:validate-token', provider });
+      return { valid: false, error: 'Validation failed' };
+    }
   });
 
   ipcMain.handle('auth:get-token', async () => {
-    return getSecureValue(AUTH_TOKEN_KEY);
+    try {
+      return await getSecureValue(AUTH_TOKEN_KEY);
+    } catch (error) {
+      console.error('[Main] auth:get-token error:', error);
+      captureException(error as Error, { context: 'ipc:auth:get-token' });
+      return null;
+    }
   });
 
   ipcMain.handle('auth:init-update-token', async () => {
-    // Called by renderer on macOS after showing the Keychain hint
-    const storedToken = await getSecureValue(AUTH_TOKEN_KEY);
-    if (storedToken) {
-      setUpdateToken(storedToken);
+    try {
+      // Called by renderer on macOS after showing the Keychain hint
+      const storedToken = await getSecureValue(AUTH_TOKEN_KEY);
+      if (storedToken) {
+        setUpdateToken(storedToken);
+      }
+      return true;
+    } catch (error) {
+      console.error('[Main] auth:init-update-token error:', error);
+      captureException(error as Error, { context: 'ipc:auth:init-update-token' });
+      return false;
     }
-    return true;
   });
 
   ipcMain.handle('auth:set-token', async (_, token: string) => {
-    setUpdateToken(token);
-    return setSecureValue(AUTH_TOKEN_KEY, token);
+    try {
+      setUpdateToken(token);
+      return await setSecureValue(AUTH_TOKEN_KEY, token);
+    } catch (error) {
+      console.error('[Main] auth:set-token error:', error);
+      captureException(error as Error, { context: 'ipc:auth:set-token' });
+      throw error;
+    }
   });
 
   ipcMain.handle('auth:clear-token', async () => {
-    setUpdateToken(null);
-    await deleteSecureValue(AUTH_TOKEN_KEY);
-    await deleteSecureValue(AUTH_REFRESH_TOKEN_KEY);
-    await deleteSecureValue(AUTH_USER_KEY);
-    return true;
+    try {
+      setUpdateToken(null);
+      await deleteSecureValue(AUTH_TOKEN_KEY);
+      await deleteSecureValue(AUTH_REFRESH_TOKEN_KEY);
+      await deleteSecureValue(AUTH_USER_KEY);
+      return true;
+    } catch (error) {
+      console.error('[Main] auth:clear-token error:', error);
+      captureException(error as Error, { context: 'ipc:auth:clear-token' });
+      return false;
+    }
   });
 
   ipcMain.handle('auth:get-refresh-token', async () => {
-    return getSecureValue(AUTH_REFRESH_TOKEN_KEY);
+    try {
+      return await getSecureValue(AUTH_REFRESH_TOKEN_KEY);
+    } catch (error) {
+      console.error('[Main] auth:get-refresh-token error:', error);
+      captureException(error as Error, { context: 'ipc:auth:get-refresh-token' });
+      return null;
+    }
   });
 
   ipcMain.handle('auth:set-refresh-token', async (_, token: string) => {
-    return setSecureValue(AUTH_REFRESH_TOKEN_KEY, token);
+    try {
+      return await setSecureValue(AUTH_REFRESH_TOKEN_KEY, token);
+    } catch (error) {
+      console.error('[Main] auth:set-refresh-token error:', error);
+      captureException(error as Error, { context: 'ipc:auth:set-refresh-token' });
+      throw error;
+    }
   });
 
   ipcMain.handle('auth:clear-refresh-token', async () => {
-    await deleteSecureValue(AUTH_REFRESH_TOKEN_KEY);
-    return true;
+    try {
+      await deleteSecureValue(AUTH_REFRESH_TOKEN_KEY);
+      return true;
+    } catch (error) {
+      console.error('[Main] auth:clear-refresh-token error:', error);
+      captureException(error as Error, { context: 'ipc:auth:clear-refresh-token' });
+      return false;
+    }
   });
 
   ipcMain.handle('auth:get-user', async () => {
-    const userJson = await getSecureValue(AUTH_USER_KEY);
-    if (userJson) {
-      try {
-        return JSON.parse(userJson);
-      } catch {
-        return null;
+    try {
+      const userJson = await getSecureValue(AUTH_USER_KEY);
+      if (userJson) {
+        try {
+          return JSON.parse(userJson);
+        } catch {
+          return null;
+        }
       }
+      return null;
+    } catch (error) {
+      console.error('[Main] auth:get-user error:', error);
+      captureException(error as Error, { context: 'ipc:auth:get-user' });
+      return null;
     }
-    return null;
   });
 
   ipcMain.handle('auth:set-user', async (_, user: { id: string; email: string; name?: string }) => {
-    return setSecureValue(AUTH_USER_KEY, JSON.stringify(user));
+    try {
+      return await setSecureValue(AUTH_USER_KEY, JSON.stringify(user));
+    } catch (error) {
+      console.error('[Main] auth:set-user error:', error);
+      captureException(error as Error, { context: 'ipc:auth:set-user' });
+      throw error;
+    }
   });
 
   // Keychain-specific handlers (primarily for macOS)
@@ -586,11 +731,13 @@ function setupIpcHandlers(): void {
     if (isSyncing) {
       if (!syncingAnimationInterval && syncingFrames.length > 0) {
         currentSyncingFrame = 0;
-        tray!.setImage(syncingFrames[0]);
+        safeSetTrayImage(syncingFrames[0]);
 
         syncingAnimationInterval = setInterval(() => {
           currentSyncingFrame = (currentSyncingFrame + 1) % syncingFrames.length;
-          if (isTrayAvailable()) tray!.setImage(syncingFrames[currentSyncingFrame]);
+          if (isTrayAvailable() && syncingFrames[currentSyncingFrame]) {
+            safeSetTrayImage(syncingFrames[currentSyncingFrame]);
+          }
         }, 80);
       }
     } else {
@@ -598,9 +745,7 @@ function setupIpcHandlers(): void {
         clearInterval(syncingAnimationInterval);
         syncingAnimationInterval = null;
       }
-      if (normalIcon && isTrayAvailable()) {
-        tray!.setImage(normalIcon);
-      }
+      safeSetTrayImage(normalIcon);
     }
   });
 }
@@ -635,18 +780,45 @@ function cleanup(): void {
 }
 
 app.on('ready', async () => {
-  createWindow();
-  createTray();
-  setupIpcHandlers();
+  try {
+    createWindow();
+  } catch (error) {
+    console.error('[Main] Failed to create window:', error);
+    captureException(error as Error, { context: 'app:ready:createWindow', fatal: true });
+  }
 
-  initAutoUpdater();
+  try {
+    createTray();
+  } catch (error) {
+    console.error('[Main] Failed to create tray:', error);
+    captureException(error as Error, { context: 'app:ready:createTray' });
+  }
+
+  try {
+    setupIpcHandlers();
+  } catch (error) {
+    console.error('[Main] Failed to setup IPC handlers:', error);
+    captureException(error as Error, { context: 'app:ready:setupIpcHandlers', fatal: true });
+  }
+
+  try {
+    initAutoUpdater();
+  } catch (error) {
+    console.error('[Main] Failed to init auto updater:', error);
+    captureException(error as Error, { context: 'app:ready:initAutoUpdater' });
+  }
 
   // On macOS, defer Keychain access to let UI show first with a hint
   // The renderer will trigger this via IPC after showing the loading screen
   if (process.platform !== 'darwin') {
-    const storedToken = await getSecureValue(AUTH_TOKEN_KEY);
-    if (storedToken) {
-      setUpdateToken(storedToken);
+    try {
+      const storedToken = await getSecureValue(AUTH_TOKEN_KEY);
+      if (storedToken) {
+        setUpdateToken(storedToken);
+      }
+    } catch (error) {
+      console.error('[Main] Failed to get stored token:', error);
+      captureException(error as Error, { context: 'app:ready:getStoredToken' });
     }
   }
 });

@@ -1,5 +1,6 @@
 import { app, autoUpdater, dialog } from 'electron';
 import { API_URL } from '../config/api';
+import { captureException } from './sentry';
 
 const BACKEND_URL = API_URL;
 const CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
@@ -56,6 +57,7 @@ async function checkForUpdateAvailability(): Promise<CheckResponse | null> {
 function setupAutoUpdaterEvents(): void {
   autoUpdater.on('error', (err) => {
     error('Error:', err.message);
+    captureException(err, { context: 'autoUpdater:error' });
   });
 
   autoUpdater.on('checking-for-update', () => {
