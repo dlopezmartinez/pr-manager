@@ -133,7 +133,9 @@ function setupAutoUpdaterEvents(): void {
 
     dialog.showMessageBox(dialogOpts).then((returnValue) => {
       if (returnValue.response === 0) {
-        autoUpdater.quitAndInstall();
+        setImmediate(() => {
+          autoUpdater.quitAndInstall(true, true);
+        });
       }
     });
   });
@@ -282,7 +284,12 @@ export function setUpdateChannel(channel: UpdateChannel): void {
 export function installUpdate(): void {
   if (currentState.status === 'ready') {
     log('Installing update...');
-    autoUpdater.quitAndInstall();
+    // Pass true for both parameters:
+    // - isSilent: don't show confirmation dialog (we already confirmed via UI)
+    // - forceRunAfter: force the app to restart after update
+    setImmediate(() => {
+      autoUpdater.quitAndInstall(true, true);
+    });
   } else {
     warn('Cannot install update - not ready');
   }
