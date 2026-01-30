@@ -376,16 +376,16 @@ jobs:
           # Check for signed artifacts first, then fall back to build artifacts
           for platform in macos windows linux; do
             if [ -d "all-artifacts/signed-$platform" ]; then
-              cp -r all-artifacts/signed-$platform/* release-assets/ 2>/dev/null || true
+              find all-artifacts/signed-$platform -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.exe" -o -name "*.nupkg" -o -name "*.deb" -o -name "*.rpm" -o -name "RELEASES" \) -exec cp {} release-assets/ \;
             elif [ -d "all-artifacts/app-$platform-release" ]; then
-              cp -r all-artifacts/app-$platform-release/* release-assets/ 2>/dev/null || true
+              find all-artifacts/app-$platform-release -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.exe" -o -name "*.nupkg" -o -name "*.deb" -o -name "*.rpm" -o -name "RELEASES" \) -exec cp {} release-assets/ \;
             elif [ -d "all-artifacts/release-artifacts/$platform" ]; then
-              cp -r all-artifacts/release-artifacts/$platform/* release-assets/ 2>/dev/null || true
+              find all-artifacts/release-artifacts/$platform -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.exe" -o -name "*.nupkg" -o -name "*.deb" -o -name "*.rpm" -o -name "RELEASES" \) -exec cp {} release-assets/ \;
             fi
           done
 
           echo "Release assets:"
-          find release-assets -type f | head -20
+          ls -la release-assets/
 
       - name: "Generate changelog"
         id: changelog
