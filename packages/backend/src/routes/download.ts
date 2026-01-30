@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { verifySignedDownload } from '../lib/signature.js';
-import { downloadLimiter } from '../middleware/rateLimit.js';
+import { downloadLimiter, publicInfoLimiter } from '../middleware/rateLimit.js';
 import {
   getReleaseByTag,
   getLatestRelease,
@@ -21,7 +21,7 @@ const router = Router();
  * Returns temporary GitHub URLs that expire after a short period
  * Redirects to /download/public/stable for backward compatibility
  */
-router.get('/public', downloadLimiter, async (_req: Request, res: Response) => {
+router.get('/public', publicInfoLimiter, async (_req: Request, res: Response) => {
   try {
     const release = await getLatestRelease();
 
@@ -67,7 +67,7 @@ router.get('/public', downloadLimiter, async (_req: Request, res: Response) => {
  * Public endpoint to get latest version for a specific channel
  * @param channel - 'stable' or 'beta'
  */
-router.get('/public/:channel', downloadLimiter, async (req: Request, res: Response) => {
+router.get('/public/:channel', publicInfoLimiter, async (req: Request, res: Response) => {
   try {
     const channelSchema = z.object({
       channel: z.enum(['stable', 'beta']),

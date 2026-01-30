@@ -110,6 +110,22 @@ export const downloadLimiter = rateLimit({
   },
 });
 
+// Less restrictive limiter for public release info endpoints (metadata only, not actual files)
+export const publicInfoLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute per IP
+  standardHeaders: false,
+  legacyHeaders: false,
+  skip: (req: Request) => process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
+  handler: (req: Request, res: Response) => {
+    res.status(429).json({
+      error: 'Too many requests',
+      message: 'Please try again later',
+      retryAfter: 60,
+    });
+  },
+});
+
 export const checkoutLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
