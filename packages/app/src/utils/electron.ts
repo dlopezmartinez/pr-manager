@@ -211,3 +211,33 @@ export async function syncUpdateChannel(channel: 'stable' | 'beta'): Promise<boo
   }
   return getElectronAPI().updates.setChannel(channel);
 }
+
+export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
+
+export interface UpdateState {
+  status: UpdateStatus;
+  version?: string;
+  progress?: number;
+  error?: string;
+}
+
+export async function getUpdateState(): Promise<UpdateState> {
+  if (!isElectron()) {
+    return { status: 'idle' };
+  }
+  return getElectronAPI().updates.getState();
+}
+
+export function installUpdate(): void {
+  if (!isElectron()) {
+    return;
+  }
+  getElectronAPI().updates.install();
+}
+
+export function onUpdateStateChange(callback: (state: UpdateState) => void): () => void {
+  if (!isElectron()) {
+    return () => {};
+  }
+  return getElectronAPI().updates.onStateChange(callback);
+}
