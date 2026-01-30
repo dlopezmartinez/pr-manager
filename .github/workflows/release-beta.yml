@@ -30,12 +30,18 @@ jobs:
       has_pr_artifacts: ${{ steps.check-artifacts.outputs.has_artifacts }}
       pr_run_id: ${{ steps.check-artifacts.outputs.run_id }}
       pr_sha: ${{ steps.check-artifacts.outputs.pr_sha }}
+      build_sha: ${{ steps.commit-version.outputs.build_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: develop
           fetch-depth: 10
           token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: "Setup Git"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: "Setup Node.js"
         uses: actions/setup-node@v4
@@ -84,6 +90,27 @@ jobs:
 
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Version: $CURRENT -> $NEW_VERSION"
+
+      - name: "Update version and commit"
+        id: commit-version
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          # Update all package.json files
+          npm version $NEW_VERSION --no-git-tag-version --workspaces --include-workspace-root
+
+          # Commit the version update
+          git add package.json package-lock.json \
+            packages/app/package.json \
+            packages/backend/package.json \
+            packages/landing/package.json
+          git commit -m "chore(release): v$NEW_VERSION"
+          git push origin develop
+
+          # Output the commit SHA for building
+          BUILD_SHA=$(git rev-parse HEAD)
+          echo "build_sha=$BUILD_SHA" >> $GITHUB_OUTPUT
+          echo "Version updated and committed: $BUILD_SHA"
 
       - name: "Check for PR artifacts"
         id: check-artifacts
@@ -214,7 +241,7 @@ jobs:
     if: needs.prepare.outputs.has_pr_artifacts != 'true'
     uses: ./.github/workflows/build-artifacts.yml
     with:
-      ref: develop
+      ref: ${{ needs.prepare.outputs.build_sha }}
       artifact-suffix: "-release"
       sign-macos: ${{ inputs.skip_signing != true }}
       sign-windows: ${{ inputs.skip_signing != true }}
@@ -339,7 +366,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: develop
+          ref: ${{ needs.prepare.outputs.build_sha }}
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN }}
 
@@ -347,21 +374,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout develop
-          git pull origin develop
-
-      - name: "Update version in package.json"
-        env:
-          NEW_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          npm version $NEW_VERSION --no-git-tag-version
-          for pkg in packages/app packages/backend packages/landing; do
-            if [ -f "$pkg/package.json" ]; then
-              cd "$pkg"
-              npm version $NEW_VERSION --no-git-tag-version
-              cd - > /dev/null
-            fi
-          done
 
       - name: "Download artifacts"
         uses: actions/download-artifact@v4
@@ -408,15 +420,6 @@ jobs:
             echo ""
             echo "EOF"
           } >> $GITHUB_OUTPUT
-
-      - name: "Commit version bump"
-        run: |
-          git add package.json package-lock.json \
-            packages/app/package.json \
-            packages/backend/package.json \
-            packages/landing/package.json
-          git commit -m "chore(release): v${{ needs.prepare.outputs.version }}"
-          git push origin develop
 
       - name: "Create and push tag"
         run: |
