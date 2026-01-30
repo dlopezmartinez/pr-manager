@@ -1,9 +1,10 @@
-import { app, autoUpdater, dialog, BrowserWindow } from 'electron';
+import { app, autoUpdater, BrowserWindow } from 'electron';
 import { API_URL } from '../config/api';
 import { captureException } from './sentry';
 
 const BACKEND_URL = API_URL;
-const CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
+const CHECK_INTERVAL = 4 * 60 * 60 * 1000; // 4 hours
+const INITIAL_CHECK_DELAY = 60 * 1000; // 1 minute after app start
 
 export type UpdateChannel = 'stable' | 'beta';
 
@@ -119,25 +120,11 @@ function setupAutoUpdaterEvents(): void {
     updateState({ status: 'idle', version: undefined, progress: undefined });
   });
 
-  autoUpdater.on('update-downloaded', (_event, releaseNotes, releaseName) => {
+  autoUpdater.on('update-downloaded', (_event, _releaseNotes, releaseName) => {
     log('Update downloaded:', releaseName);
-    updateState({ status: 'ready', progress: 100 });
-
-    const dialogOpts = {
-      type: 'info' as const,
-      buttons: ['Restart', 'Later'],
-      title: 'Application Update',
-      message: releaseName || 'A new version has been downloaded',
-      detail: 'A new version has been downloaded. Restart the application to apply the updates.',
-    };
-
-    dialog.showMessageBox(dialogOpts).then((returnValue) => {
-      if (returnValue.response === 0) {
-        setImmediate(() => {
-          autoUpdater.quitAndInstall(true, true);
-        });
-      }
-    });
+    // Just update state - UI will show "Restart to Update" button
+    // No automatic dialog to avoid annoying the user
+    updateState({ status: 'ready', version: pendingVersion, progress: 100 });
   });
 }
 
@@ -223,10 +210,12 @@ function scheduleUpdateChecks(): void {
     clearInterval(checkIntervalId);
   }
 
+  // First check after a delay (don't check immediately on startup)
   setTimeout(() => {
     performUpdateCheck();
-  }, 5000);
+  }, INITIAL_CHECK_DELAY);
 
+  // Then check periodically (every 4 hours)
   checkIntervalId = setInterval(() => {
     performUpdateCheck();
   }, CHECK_INTERVAL);
@@ -284,10 +273,12 @@ export function setUpdateChannel(channel: UpdateChannel): void {
 export function installUpdate(): void {
   if (currentState.status === 'ready') {
     log('Installing update...');
-    // Pass true for both parameters:
-    // - isSilent: don't show confirmation dialog (we already confirmed via UI)
-    // - forceRunAfter: force the app to restart after update
+
+    // Use setImmediate to ensure all IPC messages are processed
     setImmediate(() => {
+      // On macOS, quitAndInstall can be unreliable for restarting
+      // Use app.relaunch() + autoUpdater.quitAndInstall() for more reliable restart
+      app.relaunch();
       autoUpdater.quitAndInstall(true, true);
     });
   } else {
