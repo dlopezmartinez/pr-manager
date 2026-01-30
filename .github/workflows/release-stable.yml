@@ -249,6 +249,41 @@ jobs:
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+      - name: "Delete previous releases"
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          CURRENT_VERSION: v${{ needs.validate.outputs.stable_version }}
+        run: |
+          echo "Cleaning up previous releases..."
+
+          # Get all stable releases (non-prerelease)
+          STABLE_RELEASES=$(gh release list --json tagName,isPrerelease --jq '.[] | select(.isPrerelease == false) | .tagName' || true)
+
+          # Get all beta releases (prerelease)
+          BETA_RELEASES=$(gh release list --json tagName,isPrerelease --jq '.[] | select(.isPrerelease == true) | .tagName' || true)
+
+          # Delete previous stable releases
+          if [ -n "$STABLE_RELEASES" ]; then
+            echo "Found stable releases: $STABLE_RELEASES"
+            for TAG in $STABLE_RELEASES; do
+              if [ "$TAG" != "$CURRENT_VERSION" ]; then
+                echo "Deleting stable release: $TAG"
+                gh release delete "$TAG" --yes --cleanup-tag || echo "Failed to delete $TAG"
+              fi
+            done
+          fi
+
+          # Delete all beta releases (they're no longer needed after stable promotion)
+          if [ -n "$BETA_RELEASES" ]; then
+            echo "Found beta releases: $BETA_RELEASES"
+            for TAG in $BETA_RELEASES; do
+              echo "Deleting beta release: $TAG"
+              gh release delete "$TAG" --yes --cleanup-tag || echo "Failed to delete $TAG"
+            done
+          fi
+
+          echo "Cleanup complete"
+
       - name: "Create GitHub Release"
         uses: softprops/action-gh-release@v1
         with:

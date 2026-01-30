@@ -75,15 +75,6 @@ jobs:
           apple-id-password: ${{ secrets.APPLE_ID_PASSWORD }}
           apple-team-id: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: "Notarize"
-        if: inputs.sign-macos && steps.signing.outputs.identity != ''
-        uses: ./.github/actions/notarize-macos
-        with:
-          file-path: ${{ github.workspace }}/packages/app/out/make/*.dmg
-          apple-id: ${{ secrets.APPLE_ID }}
-          apple-id-password: ${{ secrets.APPLE_ID_PASSWORD }}
-          team-id: ${{ secrets.APPLE_TEAM_ID }}
-
       - name: "Find DMG for notarization"
         if: inputs.sign-macos && steps.signing.outputs.identity != ''
         id: find-dmg
