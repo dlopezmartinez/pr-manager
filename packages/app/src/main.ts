@@ -328,14 +328,35 @@ function showWindowCentered(): void {
     app.dock?.show();
   }
 
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-  const windowBounds = mainWindow!.getBounds();
+  try {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+    const windowBounds = mainWindow!.getBounds();
 
-  const x = Math.round((screenWidth - windowBounds.width) / 2);
-  const y = Math.round((screenHeight - windowBounds.height) / 2);
+    // Validate that we have valid dimensions before calculating position
+    if (
+      typeof screenWidth === 'number' && !isNaN(screenWidth) &&
+      typeof screenHeight === 'number' && !isNaN(screenHeight) &&
+      typeof windowBounds.width === 'number' && !isNaN(windowBounds.width) &&
+      typeof windowBounds.height === 'number' && !isNaN(windowBounds.height)
+    ) {
+      const x = Math.round((screenWidth - windowBounds.width) / 2);
+      const y = Math.round((screenHeight - windowBounds.height) / 2);
 
-  mainWindow!.setPosition(x, y, false);
+      // Additional validation to ensure x and y are valid integers
+      if (!isNaN(x) && !isNaN(y) && isFinite(x) && isFinite(y)) {
+        mainWindow!.setPosition(x, y, false);
+      } else {
+        console.warn('[Main] Invalid position calculated, showing without centering');
+      }
+    } else {
+      console.warn('[Main] Invalid screen or window bounds, showing without centering');
+    }
+  } catch (error) {
+    console.error('[Main] Error calculating window position:', error);
+    // Continue to show the window even if centering fails
+  }
+
   mainWindow!.show();
   mainWindow!.focus();
 

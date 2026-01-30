@@ -222,7 +222,7 @@
 
           <section class="settings-section">
             <h3>Notifications</h3>
-            
+
             <div class="setting-row">
               <div class="setting-info">
                 <label>Enable Notifications</label>
@@ -235,47 +235,18 @@
 
             <div class="setting-row" v-if="config.notificationsEnabled">
               <div class="setting-info">
-                <label>New Pull Requests</label>
-                <p class="setting-description">Notify when new PRs need your review</p>
-              </div>
-              <div class="setting-control">
-                <AppToggle v-model="config.notifyOnNewPR" />
-              </div>
-            </div>
-
-            <div class="setting-row" v-if="config.notificationsEnabled">
-              <div class="setting-info">
-                <label>New Comments</label>
-                <p class="setting-description">Notify when PRs receive new comments</p>
-              </div>
-              <div class="setting-control">
-                <AppToggle v-model="config.notifyOnNewComments" />
-              </div>
-            </div>
-
-            <div class="setting-row" v-if="config.notificationsEnabled">
-              <div class="setting-info">
-                <label>Test Notifications</label>
+                <label>Test Notification</label>
                 <p class="setting-description">Send a test notification to verify setup</p>
               </div>
-              <div class="setting-control test-buttons">
+              <div class="setting-control">
                 <button
                   class="test-btn"
-                  :class="{ 'test-sent': testNotificationSent && testNotificationType === 'pr' }"
-                  @click="testNewPRNotification"
+                  :class="{ 'test-sent': testNotificationSent }"
+                  @click="testNotification"
                 >
-                  <Check v-if="testNotificationSent && testNotificationType === 'pr'" :size="14" :stroke-width="2" />
+                  <Check v-if="testNotificationSent" :size="14" :stroke-width="2" />
                   <Bell v-else :size="14" :stroke-width="2" />
-                  <span>{{ testNotificationSent && testNotificationType === 'pr' ? 'Sent!' : 'New PR' }}</span>
-                </button>
-                <button
-                  class="test-btn"
-                  :class="{ 'test-sent': testNotificationSent && testNotificationType === 'comment' }"
-                  @click="testNewCommentNotification"
-                >
-                  <Check v-if="testNotificationSent && testNotificationType === 'comment'" :size="14" :stroke-width="2" />
-                  <MessageSquare v-else :size="14" :stroke-width="2" />
-                  <span>{{ testNotificationSent && testNotificationType === 'comment' ? 'Sent!' : 'New Comment' }}</span>
+                  <span>{{ testNotificationSent ? 'Sent!' : 'Test' }}</span>
                 </button>
               </div>
             </div>
@@ -286,52 +257,12 @@
 
             <div class="setting-row">
               <div class="setting-info">
-                <label>Enable Follow-up</label>
-                <p class="setting-description">Track changes on PRs you're following</p>
-              </div>
-              <div class="setting-control">
-                <AppToggle v-model="config.followUpEnabled" />
-              </div>
-            </div>
-
-            <div class="setting-row" v-if="config.followUpEnabled">
-              <div class="setting-info">
-                <label>Notify on New Commits</label>
-                <p class="setting-description">Get notified when followed PRs have new commits</p>
-              </div>
-              <div class="setting-control">
-                <AppToggle v-model="config.followUpNotifyOnCommits" />
-              </div>
-            </div>
-
-            <div class="setting-row" v-if="config.followUpEnabled">
-              <div class="setting-info">
-                <label>Notify on New Comments</label>
-                <p class="setting-description">Get notified when followed PRs have new comments</p>
-              </div>
-              <div class="setting-control">
-                <AppToggle v-model="config.followUpNotifyOnComments" />
-              </div>
-            </div>
-
-            <div class="setting-row" v-if="config.followUpEnabled">
-              <div class="setting-info">
-                <label>Notify on New Reviews</label>
-                <p class="setting-description">Get notified when followed PRs have new reviews</p>
-              </div>
-              <div class="setting-control">
-                <AppToggle v-model="config.followUpNotifyOnReviews" />
-              </div>
-            </div>
-
-            <div class="setting-row" v-if="config.followUpEnabled">
-              <div class="setting-info">
                 <label>Following</label>
-                <p class="setting-description">PRs you're currently tracking</p>
+                <p class="setting-description">PRs you're currently tracking for updates</p>
               </div>
               <div class="setting-control">
                 <span class="follow-count-badge">{{ followedPRsCount }} PR{{ followedPRsCount !== 1 ? 's' : '' }}</span>
-                <button v-if="followedPRsCount > 0" class="text-btn danger" @click="handleClearFollowed">Clear all</button>
+                <button v-if="followedPRsCount > 0" class="text-btn danger" @click="handleClearFollowed">Unfollow all</button>
               </div>
             </div>
           </section>
@@ -346,20 +277,6 @@
               </div>
               <div class="setting-control">
                 <AppToggle v-model="config.prefetchOnHover" />
-              </div>
-            </div>
-          </section>
-
-          <section class="settings-section">
-            <h3>Filtering</h3>
-            
-            <div class="setting-row">
-              <div class="setting-info">
-                <label>Explicit Reviewer Only</label>
-                <p class="setting-description">Only show PRs where you're directly requested as reviewer (not via team)</p>
-              </div>
-              <div class="setting-control">
-                <AppToggle v-model="config.explicitReviewerOnly" />
               </div>
             </div>
           </section>
@@ -572,7 +489,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { X, Bell, MessageSquare, Github, GitMerge, AlertCircle, ArrowRight, ExternalLink, Check, Eye, AlertTriangle, RefreshCw, Download, Info } from 'lucide-vue-next';
+import { X, Bell, Github, GitMerge, AlertCircle, ArrowRight, ExternalLink, Check, Eye, AlertTriangle, RefreshCw, Download, Info } from 'lucide-vue-next';
 import TitleBar from './TitleBar.vue';
 import { AppToggle } from './ui';
 import type { TokenValidationResult } from '../utils/electron';
@@ -681,10 +598,6 @@ function loadZoomLevel() {
   }
 }
 
-watch(() => config.explicitReviewerOnly, () => {
-  emit('refresh-needed');
-});
-
 const maskedToken = computed(() => {
   const token = getApiKey();
   if (!token) return '(not set)';
@@ -777,36 +690,18 @@ function openTokenCreationPage() {
 }
 
 const testNotificationSent = ref(false);
-const testNotificationType = ref<'pr' | 'comment' | null>(null);
 
-function testNewPRNotification() {
-  console.log('[Settings] Testing New PR notification...');
+function testNotification() {
+  console.log('[Settings] Testing notification...');
   showNotification({
-    title: 'Test: New Pull Request',
-    body: 'octocat: Add amazing new feature',
-    subtitle: 'octocat/hello-world',
+    title: 'Test Notification',
+    body: 'Notifications are working correctly!',
+    subtitle: 'PR Manager',
     url: 'https://github.com',
   });
-  showTestFeedback('pr');
-}
-
-function testNewCommentNotification() {
-  console.log('[Settings] Testing New Comment notification...');
-  showNotification({
-    title: 'Test: 3 new comments',
-    body: 'Fix critical bug in authentication',
-    subtitle: 'myorg/myrepo #42',
-    url: 'https://github.com',
-  });
-  showTestFeedback('comment');
-}
-
-function showTestFeedback(type: 'pr' | 'comment') {
-  testNotificationType.value = type;
   testNotificationSent.value = true;
   setTimeout(() => {
     testNotificationSent.value = false;
-    testNotificationType.value = null;
   }, 2000);
 }
 
